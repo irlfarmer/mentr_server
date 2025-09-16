@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { User } from '../models/User';
 import { generateToken } from '../utils/jwt';
 import { LoginCredentials, RegisterData } from '../types';
-import { emailService } from '../services/emailService';
+import emailService from '../services/emailService';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 

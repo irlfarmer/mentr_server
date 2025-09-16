@@ -81,6 +81,17 @@ export class EmailPreferencesService {
     }
   }
 
+  // Get unsubscribe token for a user
+  static async getUnsubscribeToken(userId: string): Promise<string | null> {
+    try {
+      const preferences = await EmailPreferences.findOne({ userId });
+      return preferences?.unsubscribeToken || null;
+    } catch (error) {
+      console.error('Error getting unsubscribe token:', error);
+      return null;
+    }
+  }
+
   // Update email preferences
   static async updateEmailPreferences(
     userId: string, 

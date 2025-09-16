@@ -63,13 +63,13 @@ class EmailService {
     const preferencesUrl = process.env.FRONTEND_URL + '/settings/email-preferences';
 
     const footer = `
-      <div style="background: #f8f9fa; padding: 20px; text-align: center; border-top: 1px solid #eee; margin-top: 30px;">
-        <p style="color: #666; font-size: 12px; margin: 0 0 10px 0;">
+      <div style="background: #f9fafb; padding: 20px; text-align: center; border-top: 1px solid #e5e7eb; margin-top: 30px;">
+        <p style="color: #6b7280; font-size: 12px; margin: 0 0 10px 0;">
           You're receiving this email because you have an account with Mentr.
         </p>
-        <p style="color: #666; font-size: 12px; margin: 0;">
-          <a href="${unsubscribeUrl}" style="color: #666; text-decoration: underline;">Unsubscribe</a> | 
-          <a href="${preferencesUrl}" style="color: #666; text-decoration: underline;">Manage Email Preferences</a>
+        <p style="color: #6b7280; font-size: 12px; margin: 0;">
+          <a href="${unsubscribeUrl}" style="color: #6b7280; text-decoration: underline;">Unsubscribe</a> | 
+          <a href="${preferencesUrl}" style="color: #6b7280; text-decoration: underline;">Manage Email Preferences</a>
         </p>
       </div>
     `;
@@ -99,47 +99,34 @@ class EmailService {
           return true; // Return true as it's not an error, just filtered out
         }
 
-        const shouldSendFrequency = await EmailPreferencesService.shouldSendBasedOnFrequency(userId);
-        if (!shouldSendFrequency) {
-          console.log(`Email not sent to user ${userId} due to frequency preferences`);
-          return true;
-        }
-
-        // Get unsubscribe token
-        const preferences = await EmailPreferencesService.getEmailPreferences(userId);
-        unsubscribeToken = preferences?.unsubscribeToken;
+        unsubscribeToken = await EmailPreferencesService.getUnsubscribeToken(userId) || undefined;
       }
 
-      // Add unsubscribe footer to HTML
-      const htmlWithFooter = this.addUnsubscribeFooter(html, unsubscribeToken, String(category));
+      // Add unsubscribe footer if token is available
+      const finalHtml = this.addUnsubscribeFooter(html, unsubscribeToken, category);
 
-      await resend.emails.send({
+      const { data, error } = await resend.emails.send({
         from: this.fromEmail,
         to: Array.isArray(to) ? to : [to],
         subject,
-        html: htmlWithFooter
+        html: finalHtml,
       });
 
-      // Record email sent if userId is provided
-      if (userId) {
-        await EmailPreferencesService.recordEmailSent(userId);
+      if (error) {
+        console.error('Error sending email:', error);
+        return false;
       }
 
+      console.log('Email sent successfully:', data);
       return true;
     } catch (error) {
-      console.error('Error sending email:', error);
-      
-      // Record bounce if userId is provided
-      if (userId) {
-        await EmailPreferencesService.recordEmailBounce(Array.isArray(to) ? to[0] : to);
-      }
-      
+      console.error('Error in sendEmailWithPreferences:', error);
       return false;
     }
   }
 
   /**
-   * Send email verification
+   * Send verification email
    */
   async sendVerificationEmail(data: VerificationEmailData, userId?: string): Promise<boolean> {
     try {
@@ -209,11 +196,70 @@ class EmailService {
   }
 
   /**
+   * Send generic email
+   */
+  async sendGenericEmail(to: string, subject: string, message: string, userId?: string): Promise<boolean> {
+    try {
+      const html = this.createGenericEmailHtml(subject, message);
+      
+      return await this.sendEmailWithPreferences(to, subject, html, userId, 'system');
+    } catch (error) {
+      console.error('Error sending generic email:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Create generic email template
+   */
+  private createGenericEmailHtml(subject: string, message: string): string {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>${subject} - Mentr</title>
+      </head>
+      <body style="margin: 0; padding: 0; background-color: #f9fafb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+        <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff;">
+          
+          <!-- Header -->
+          <div style="background: #2563eb; padding: 40px 30px; text-align: center;">
+            <div style="display: inline-flex; align-items: center; margin-bottom: 20px;">
+              <div style="width: 40px; height: 40px; background-color: #ffffff; border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-right: 12px;">
+                <span style="font-size: 20px; font-weight: bold; color: #2563eb;">M</span>
+              </div>
+              <h1 style="color: #ffffff; font-size: 28px; font-weight: bold; margin: 0;">Mentr</h1>
+            </div>
+            <p style="color: #e0e7ff; font-size: 16px; margin: 0;">${subject}</p>
+          </div>
+
+          <!-- Content -->
+          <div style="padding: 40px 30px;">
+            <div style="color: #374151; font-size: 16px; line-height: 1.6; margin: 0;">
+              ${message.replace(/\n/g, '<br>')}
+            </div>
+          </div>
+
+          <!-- Footer -->
+          <div style="background: #f9fafb; padding: 20px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+            <p style="color: #6b7280; font-size: 12px; margin: 0;">
+              © 2024 Mentr. All rights reserved.
+            </p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
+  /**
    * Create verification email template
    */
   private createVerificationEmail(data: VerificationEmailData): EmailTemplate {
     return {
-      to: data.email, // Use the email address
+      to: data.email,
       subject: 'Welcome to Mentr! Verify your account',
       html: `
         <!DOCTYPE html>
@@ -223,8 +269,8 @@ class EmailService {
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <title>Welcome to Mentr! - Verify your account</title>
         </head>
-        <body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
-          <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+        <body style="margin: 0; padding: 0; background-color: #f9fafb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+          <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff;">
             
             <!-- Header -->
             <div style="background: #2563eb; padding: 40px 30px; text-align: center;">
@@ -232,58 +278,50 @@ class EmailService {
                 <div style="width: 40px; height: 40px; background-color: #ffffff; border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-right: 12px;">
                   <span style="font-size: 20px; font-weight: bold; color: #2563eb;">M</span>
                 </div>
-                <span style="color: #ffffff; font-size: 24px; font-weight: bold; letter-spacing: -0.5px;">Mentr</span>
+                <h1 style="color: #ffffff; font-size: 28px; font-weight: bold; margin: 0;">Mentr</h1>
               </div>
-              <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">Welcome to Mentr!</h1>
-              <p style="color: #e2e8f0; margin: 8px 0 0 0; font-size: 16px; font-weight: 400;">Your mentorship journey starts here</p>
+              <p style="color: #e0e7ff; font-size: 16px; margin: 0;">Welcome to the future of mentorship</p>
             </div>
-            
+
             <!-- Content -->
             <div style="padding: 40px 30px;">
-              <h2 style="color: #1e293b; margin: 0 0 16px 0; font-size: 20px; font-weight: 600;">Hi ${data.name}!</h2>
-              <p style="color: #64748b; margin: 0 0 24px 0; font-size: 16px; line-height: 1.6;">
-                Thank you for joining Mentr! We're excited to have you on board. To complete your registration and start connecting with amazing mentors, please verify your email address.
-              </p>
+              <h2 style="color: #111827; font-size: 24px; font-weight: bold; margin: 0 0 20px 0;">Welcome to Mentr, ${data.name}!</h2>
               
-              <!-- CTA Button -->
-              <div style="text-align: center; margin: 32px 0;">
+              <p style="color: #374151; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
+                Thank you for joining Mentr! We're excited to have you on board. To get started, please verify your email address by clicking the button below.
+              </p>
+
+              <div style="text-align: center; margin: 30px 0;">
                 <a href="${data.verificationLink}" 
-                   style="background: #10b981; color: #ffffff !important; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; display: inline-block;">
+                   style="background: #2563eb; color: #ffffff !important; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; font-size: 16px;">
                   Verify Email Address
                 </a>
               </div>
-              
-              <!-- Features -->
-              <div style="background-color: #f1f5f9; padding: 24px; border-radius: 8px; margin: 24px 0;">
-                <h3 style="color: #1e293b; margin: 0 0 16px 0; font-size: 18px; font-weight: 600;">What you can do on Mentr:</h3>
-                <ul style="color: #64748b; margin: 0; padding-left: 20px; font-size: 14px; line-height: 1.6;">
-                  <li>Connect with verified mentors in your field</li>
-                  <li>Book 1-on-1 sessions and get personalized guidance</li>
-                  <li>Join group sessions and learn with peers</li>
-                  <li>Track your learning progress and achievements</li>
+
+              <p style="color: #6b7280; font-size: 14px; line-height: 1.6; margin: 20px 0 0 0;">
+                If the button doesn't work, you can also copy and paste this link into your browser:
+              </p>
+              <p style="color: #6b7280; font-size: 14px; word-break: break-all; margin: 10px 0 0 0;">
+                ${data.verificationLink}
+              </p>
+
+              <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 30px 0;">
+                <h3 style="color: #111827; font-size: 18px; font-weight: 600; margin: 0 0 10px 0;">What's next?</h3>
+                <ul style="color: #374151; font-size: 14px; line-height: 1.6; margin: 0; padding-left: 20px;">
+                  <li>Complete your profile setup</li>
+                  <li>Browse available mentors or services</li>
+                  <li>Start your mentorship journey</li>
                 </ul>
               </div>
-              
-              <!-- Fallback Link -->
-              <div style="background-color: #f1f5f9; padding: 20px; border-radius: 8px; margin: 24px 0;">
-                <p style="color: #64748b; margin: 0 0 8px 0; font-size: 14px; font-weight: 500;">If the button doesn't work, copy and paste this link:</p>
-                <p style="color: #2563eb; margin: 0; font-size: 14px; word-break: break-all; font-family: monospace;">${data.verificationLink}</p>
-              </div>
-              
-              <!-- Security Notice -->
-              <div style="background-color: #fef3c7;  #f59e0b; padding: 16px; border-radius: 8px; margin: 24px 0;">
-                <p style="color: #92400e; margin: 0; font-size: 14px; font-weight: 500;">
-                  This verification link will expire in 24 hours. If you didn't create an account with Mentr, please ignore this email.
-                </p>
-              </div>
-            </div>
-            
-            <!-- Footer -->
-            <div style="background-color: #f8fafc; padding: 24px 30px; ">
-              <p style="color: #64748b; margin: 0; font-size: 14px; text-align: center;">
-                This email was sent by <strong>Mentr</strong> - Your trusted mentorship platform
+
+              <p style="color: #6b7280; font-size: 14px; line-height: 1.6; margin: 30px 0 0 0;">
+                If you didn't create an account with Mentr, please ignore this email.
               </p>
-              <p style="color: #94a3b8; margin: 8px 0 0 0; font-size: 12px; text-align: center;">
+            </div>
+
+            <!-- Footer -->
+            <div style="background: #f9fafb; padding: 20px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="color: #6b7280; font-size: 12px; margin: 0;">
                 © 2024 Mentr. All rights reserved.
               </p>
             </div>
@@ -299,7 +337,7 @@ class EmailService {
    */
   private createPasswordResetEmail(data: PasswordResetEmailData): EmailTemplate {
     return {
-      to: data.email, // Use the email address
+      to: data.email,
       subject: 'Reset your Mentr password',
       html: `
         <!DOCTYPE html>
@@ -309,8 +347,8 @@ class EmailService {
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <title>Reset your password - Mentr</title>
         </head>
-        <body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
-          <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+        <body style="margin: 0; padding: 0; background-color: #f9fafb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+          <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff;">
             
             <!-- Header -->
             <div style="background: #2563eb; padding: 40px 30px; text-align: center;">
@@ -318,47 +356,43 @@ class EmailService {
                 <div style="width: 40px; height: 40px; background-color: #ffffff; border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-right: 12px;">
                   <span style="font-size: 20px; font-weight: bold; color: #2563eb;">M</span>
                 </div>
-                <span style="color: #ffffff; font-size: 24px; font-weight: bold; letter-spacing: -0.5px;">Mentr</span>
+                <h1 style="color: #ffffff; font-size: 28px; font-weight: bold; margin: 0;">Mentr</h1>
               </div>
-              <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">Password Reset</h1>
-              <p style="color: #e2e8f0; margin: 8px 0 0 0; font-size: 16px; font-weight: 400;">Secure your account</p>
+              <p style="color: #e0e7ff; font-size: 16px; margin: 0;">Reset your password</p>
             </div>
-            
+
             <!-- Content -->
             <div style="padding: 40px 30px;">
-              <h2 style="color: #1e293b; margin: 0 0 16px 0; font-size: 20px; font-weight: 600;">Hi ${data.name}!</h2>
-              <p style="color: #64748b; margin: 0 0 24px 0; font-size: 16px; line-height: 1.6;">
+              <h2 style="color: #111827; font-size: 24px; font-weight: bold; margin: 0 0 20px 0;">Hi ${data.name}!</h2>
+              
+              <p style="color: #374151; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
                 We received a request to reset your password for your Mentr account. Click the button below to create a new password.
               </p>
-              
-              <!-- CTA Button -->
-              <div style="text-align: center; margin: 32px 0;">
+
+              <div style="text-align: center; margin: 30px 0;">
                 <a href="${data.resetLink}" 
-                   style="background: #2563eb; color: #ffffff !important; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; display: inline-block;">
+                   style="background: #2563eb; color: #ffffff !important; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; font-size: 16px;">
                   Reset Password
                 </a>
               </div>
-              
-              <!-- Fallback Link -->
-              <div style="background-color: #f1f5f9; padding: 20px; border-radius: 8px; margin: 24px 0;">
-                <p style="color: #64748b; margin: 0 0 8px 0; font-size: 14px; font-weight: 500;">If the button doesn't work, copy and paste this link:</p>
-                <p style="color: #2563eb; margin: 0; font-size: 14px; word-break: break-all; font-family: monospace;">${data.resetLink}</p>
-              </div>
-              
-              <!-- Security Notice -->
-              <div style="background-color: #fef3c7; padding: 16px; border-radius: 8px; margin: 24px 0;">
+
+              <p style="color: #6b7280; font-size: 14px; line-height: 1.6; margin: 20px 0 0 0;">
+                If the button doesn't work, you can also copy and paste this link into your browser:
+              </p>
+              <p style="color: #6b7280; font-size: 14px; word-break: break-all; margin: 10px 0 0 0;">
+                ${data.resetLink}
+              </p>
+
+              <div style="background: #fef3c7; border: 1px solid #f59e0b; padding: 16px; border-radius: 8px; margin: 30px 0;">
                 <p style="color: #92400e; margin: 0; font-size: 14px; font-weight: 500;">
                   This reset link will expire in 1 hour. If you didn't request a password reset, please ignore this email.
                 </p>
               </div>
             </div>
-            
+
             <!-- Footer -->
-            <div style="background-color: #f8fafc; padding: 24px 30px; ">
-              <p style="color: #64748b; margin: 0; font-size: 14px; text-align: center;">
-                This email was sent by <strong>Mentr</strong> - Your trusted mentorship platform
-              </p>
-              <p style="color: #94a3b8; margin: 8px 0 0 0; font-size: 12px; text-align: center;">
+            <div style="background: #f9fafb; padding: 20px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="color: #6b7280; font-size: 12px; margin: 0;">
                 © 2024 Mentr. All rights reserved.
               </p>
             </div>
@@ -400,7 +434,7 @@ class EmailService {
     const config = typeConfig[type];
 
     return {
-      to: data.email, // Use the email address
+      to: data.email,
       subject: config.subject,
       html: `
         <!DOCTYPE html>
@@ -410,8 +444,8 @@ class EmailService {
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <title>${config.title} - Mentr</title>
         </head>
-        <body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
-          <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+        <body style="margin: 0; padding: 0; background-color: #f9fafb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+          <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff;">
             
             <!-- Header -->
             <div style="background: #2563eb; padding: 40px 30px; text-align: center;">
@@ -419,79 +453,45 @@ class EmailService {
                 <div style="width: 40px; height: 40px; background-color: #ffffff; border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-right: 12px;">
                   <span style="font-size: 20px; font-weight: bold; color: #2563eb;">M</span>
                 </div>
-                <span style="color: #ffffff; font-size: 24px; font-weight: bold; letter-spacing: -0.5px;">Mentr</span>
+                <h1 style="color: #ffffff; font-size: 28px; font-weight: bold; margin: 0;">Mentr</h1>
               </div>
-              <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">${config.title}</h1>
-              <p style="color: #e2e8f0; margin: 8px 0 0 0; font-size: 16px; font-weight: 400;">Session Update</p>
+              <p style="color: #e0e7ff; font-size: 16px; margin: 0;">${config.title}</p>
             </div>
-            
+
             <!-- Content -->
             <div style="padding: 40px 30px;">
-              <h2 style="color: #1e293b; margin: 0 0 16px 0; font-size: 20px; font-weight: 600;">Hi ${data.name}!</h2>
+              <h2 style="color: #111827; font-size: 24px; font-weight: bold; margin: 0 0 20px 0;">Hi ${data.name}!</h2>
               
-              ${type === 'confirmation' ? `
-                <p style="color: #64748b; margin: 0 0 24px 0; font-size: 16px; line-height: 1.6;">
-                  Great news! Your session with <strong style="color: #1e293b;">${data.mentorName}</strong> has been confirmed and is ready to go.
+              <div style="background: ${config.bgColor}; border: 1px solid ${config.borderColor}; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                <h3 style="color: ${config.color}; font-size: 18px; font-weight: 600; margin: 0 0 10px 0;">${config.title}</h3>
+                <p style="color: #374151; font-size: 16px; line-height: 1.6; margin: 0;">
+                  Your session with <strong>${data.mentorName}</strong> is scheduled for:
                 </p>
-              ` : type === 'reminder' ? `
-                <p style="color: #64748b; margin: 0 0 24px 0; font-size: 16px; line-height: 1.6;">
-                  This is a friendly reminder that your session with <strong style="color: #1e293b;">${data.mentorName}</strong> is coming up soon.
+                <p style="color: #374151; font-size: 16px; font-weight: 600; margin: 10px 0 0 0;">
+                  ${data.sessionDate} at ${data.sessionTime}
                 </p>
-              ` : `
-                <p style="color: #64748b; margin: 0 0 24px 0; font-size: 16px; line-height: 1.6;">
-                  We're sorry to inform you that your session with <strong style="color: #1e293b;">${data.mentorName}</strong> has been cancelled.
+                <p style="color: #6b7280; font-size: 14px; margin: 10px 0 0 0;">
+                  Session Type: ${data.sessionType}
                 </p>
-              `}
-              
-              <!-- Session Details Card -->
-              <div style="background-color: ${config.bgColor};  ${config.borderColor}; padding: 24px; border-radius: 12px; margin: 24px 0;">
-                <div style="display: flex; align-items: center; margin-bottom: 16px;">
-                  <div style="width: 8px; height: 8px; background-color: ${config.color}; border-radius: 50%; margin-right: 12px;"></div>
-                  <h3 style="margin: 0; color: #1e293b; font-size: 18px; font-weight: 600;">Session Details</h3>
-                </div>
-                <div style="display: grid; gap: 12px;">
-                  <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span style="color: #64748b; font-weight: 500;">Mentor:</span>
-                    <span style="color: #1e293b; font-weight: 600;">${data.mentorName}</span>
-                  </div>
-                  <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span style="color: #64748b; font-weight: 500;">Date:</span>
-                    <span style="color: #1e293b; font-weight: 600;">${data.sessionDate}</span>
-                  </div>
-                  <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span style="color: #64748b; font-weight: 500;">Time:</span>
-                    <span style="color: #1e293b; font-weight: 600;">${data.sessionTime}</span>
-                  </div>
-                  <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span style="color: #64748b; font-weight: 500;">Type:</span>
-                    <span style="color: #1e293b; font-weight: 600;">${data.sessionType}</span>
-                  </div>
-                  ${data.meetingLink ? `
-                    <div style="margin-top: 16px; text-align: center;">
-                      <a href="${data.meetingLink}" 
-                         style="background: #2563eb; color: #ffffff !important; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px; display: inline-block;">
-                        Join Session
-                      </a>
-                    </div>
-                  ` : ''}
-                </div>
               </div>
-              
-              <!-- Action Button -->
-              <div style="text-align: center; margin: 32px 0;">
-                <a href="${process.env.FRONTEND_URL}/bookings" 
-                   style="background: #2563eb; color: #ffffff !important; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; display: inline-block;">
-                  View All Bookings
+
+              ${data.meetingLink ? `
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="${data.meetingLink}" 
+                   style="background: #2563eb; color: #ffffff !important; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; font-size: 16px;">
+                  Join Session
                 </a>
               </div>
-            </div>
-            
-            <!-- Footer -->
-            <div style="background-color: #f8fafc; padding: 24px 30px; ">
-              <p style="color: #64748b; margin: 0; font-size: 14px; text-align: center;">
-                This email was sent by <strong>Mentr</strong> - Your trusted mentorship platform
+              ` : ''}
+
+              <p style="color: #6b7280; font-size: 14px; line-height: 1.6; margin: 30px 0 0 0;">
+                If you have any questions, please contact our support team.
               </p>
-              <p style="color: #94a3b8; margin: 8px 0 0 0; font-size: 12px; text-align: center;">
+            </div>
+
+            <!-- Footer -->
+            <div style="background: #f9fafb; padding: 20px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="color: #6b7280; font-size: 12px; margin: 0;">
                 © 2024 Mentr. All rights reserved.
               </p>
             </div>
@@ -526,15 +526,15 @@ class EmailService {
         color: '#f59e0b',
         bgColor: '#fffbeb',
         borderColor: '#f59e0b',
-        message: 'Your payout is being processed and will be available soon.'
+        message: 'Your payout is being processed and will be completed soon.'
       }
     };
 
     const config = statusConfig[data.status];
 
     return {
-      to: data.email, // Use the email address
-        subject: `${config.title} - $${data.amount.toFixed(2)} payout`,
+      to: data.email,
+      subject: `${config.title} - Your Mentr payout`,
       html: `
         <!DOCTYPE html>
         <html>
@@ -543,8 +543,8 @@ class EmailService {
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <title>${config.title} - Mentr</title>
         </head>
-        <body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
-          <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+        <body style="margin: 0; padding: 0; background-color: #f9fafb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+          <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff;">
             
             <!-- Header -->
             <div style="background: #2563eb; padding: 40px 30px; text-align: center;">
@@ -552,70 +552,36 @@ class EmailService {
                 <div style="width: 40px; height: 40px; background-color: #ffffff; border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-right: 12px;">
                   <span style="font-size: 20px; font-weight: bold; color: #2563eb;">M</span>
                 </div>
-                <span style="color: #ffffff; font-size: 24px; font-weight: bold; letter-spacing: -0.5px;">Mentr</span>
+                <h1 style="color: #ffffff; font-size: 28px; font-weight: bold; margin: 0;">Mentr</h1>
               </div>
-              <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">${config.title}</h1>
-              <p style="color: #e2e8f0; margin: 8px 0 0 0; font-size: 16px; font-weight: 400;">Earnings Update</p>
+              <p style="color: #e0e7ff; font-size: 16px; margin: 0;">Payout Notification</p>
             </div>
-            
+
             <!-- Content -->
             <div style="padding: 40px 30px;">
-              <h2 style="color: #1e293b; margin: 0 0 16px 0; font-size: 20px; font-weight: 600;">Hi ${data.name}!</h2>
-              <p style="color: #64748b; margin: 0 0 24px 0; font-size: 16px; line-height: 1.6;">
-                ${config.message}
+              <h2 style="color: #111827; font-size: 24px; font-weight: bold; margin: 0 0 20px 0;">Hi ${data.name}!</h2>
+              
+              <div style="background: ${config.bgColor}; border: 1px solid ${config.borderColor}; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                <h3 style="color: ${config.color}; font-size: 18px; font-weight: 600; margin: 0 0 10px 0;">${config.title}</h3>
+                <p style="color: #374151; font-size: 16px; line-height: 1.6; margin: 0 0 10px 0;">
+                  ${config.message}
+                </p>
+                <p style="color: #374151; font-size: 16px; font-weight: 600; margin: 10px 0 0 0;">
+                  Amount: $${data.amount.toFixed(2)}
+                </p>
+                <p style="color: #6b7280; font-size: 14px; margin: 10px 0 0 0;">
+                  Date: ${data.payoutDate}
+                </p>
+              </div>
+
+              <p style="color: #6b7280; font-size: 14px; line-height: 1.6; margin: 30px 0 0 0;">
+                If you have any questions about this payout, please contact our support team.
               </p>
-              
-              <!-- Payout Details Card -->
-              <div style="background-color: ${config.bgColor};  ${config.borderColor}; padding: 24px; border-radius: 12px; margin: 24px 0;">
-                <div style="display: flex; align-items: center; margin-bottom: 16px;">
-                  <div style="width: 8px; height: 8px; background-color: ${config.color}; border-radius: 50%; margin-right: 12px;"></div>
-                  <h3 style="margin: 0; color: #1e293b; font-size: 18px; font-weight: 600;">Payout Details</h3>
-                </div>
-                <div style="display: grid; gap: 12px;">
-                  <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span style="color: #64748b; font-weight: 500;">Amount:</span>
-                    <span style="color: #1e293b; font-weight: 700; font-size: 18px;">$${data.amount.toFixed(2)}</span>
-                  </div>
-                  <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span style="color: #64748b; font-weight: 500;">Date:</span>
-                    <span style="color: #1e293b; font-weight: 600;">${data.payoutDate}</span>
-                  </div>
-                  <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span style="color: #64748b; font-weight: 500;">Status:</span>
-                    <span style="color: ${config.color}; font-weight: 600; text-transform: uppercase; font-size: 14px;">${data.status}</span>
-                  </div>
-                </div>
-              </div>
-              
-              <!-- Action Button -->
-              <div style="text-align: center; margin: 32px 0;">
-                <a href="${process.env.FRONTEND_URL}/earnings" 
-                   style="background: #2563eb; color: #ffffff !important; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; display: inline-block;">
-                  View Earnings Dashboard
-                </a>
-              </div>
-              
-              ${data.status === 'failed' ? `
-                <!-- Help Section for Failed Payouts -->
-                <div style="background-color: #fef2f2;  #fecaca; padding: 20px; border-radius: 8px; margin: 24px 0;">
-                  <h4 style="color: #dc2626; margin: 0 0 12px 0; font-size: 16px; font-weight: 600;">Need Help?</h4>
-                  <p style="color: #991b1b; margin: 0 0 12px 0; font-size: 14px; line-height: 1.5;">
-                    If you're having trouble with your payout, please check your Stripe Connect account settings or contact our support team.
-                  </p>
-                  <a href="${process.env.FRONTEND_URL}/support" 
-                     style="color: #dc2626; font-weight: 600; font-size: 14px; text-decoration: none;">
-                    Contact Support →
-                  </a>
-                </div>
-              ` : ''}
             </div>
-            
+
             <!-- Footer -->
-            <div style="background-color: #f8fafc; padding: 24px 30px; ">
-              <p style="color: #64748b; margin: 0; font-size: 14px; text-align: center;">
-                This email was sent by <strong>Mentr</strong> - Your trusted mentorship platform
-              </p>
-              <p style="color: #94a3b8; margin: 8px 0 0 0; font-size: 12px; text-align: center;">
+            <div style="background: #f9fafb; padding: 20px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="color: #6b7280; font-size: 12px; margin: 0;">
                 © 2024 Mentr. All rights reserved.
               </p>
             </div>
@@ -657,7 +623,7 @@ class EmailService {
     const config = statusConfig[data.status];
 
     return {
-      to: data.email, // Use the email address
+      to: data.email,
       subject: `${config.title} - Dispute #${data.disputeId}`,
       html: `
         <!DOCTYPE html>
@@ -667,8 +633,8 @@ class EmailService {
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <title>${config.title} - Mentr</title>
         </head>
-        <body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
-          <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+        <body style="margin: 0; padding: 0; background-color: #f9fafb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+          <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff;">
             
             <!-- Header -->
             <div style="background: #2563eb; padding: 40px 30px; text-align: center;">
@@ -676,70 +642,36 @@ class EmailService {
                 <div style="width: 40px; height: 40px; background-color: #ffffff; border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-right: 12px;">
                   <span style="font-size: 20px; font-weight: bold; color: #2563eb;">M</span>
                 </div>
-                <span style="color: #ffffff; font-size: 24px; font-weight: bold; letter-spacing: -0.5px;">Mentr</span>
+                <h1 style="color: #ffffff; font-size: 28px; font-weight: bold; margin: 0;">Mentr</h1>
               </div>
-              <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">${config.title}</h1>
-              <p style="color: #e2e8f0; margin: 8px 0 0 0; font-size: 16px; font-weight: 400;">Dispute Center</p>
+              <p style="color: #e0e7ff; font-size: 16px; margin: 0;">Dispute Notification</p>
             </div>
-            
+
             <!-- Content -->
             <div style="padding: 40px 30px;">
-              <h2 style="color: #1e293b; margin: 0 0 16px 0; font-size: 20px; font-weight: 600;">Hi ${data.name}!</h2>
-              <p style="color: #64748b; margin: 0 0 24px 0; font-size: 16px; line-height: 1.6;">
-                ${config.message}
+              <h2 style="color: #111827; font-size: 24px; font-weight: bold; margin: 0 0 20px 0;">Hi ${data.name}!</h2>
+              
+              <div style="background: ${config.bgColor}; border: 1px solid ${config.borderColor}; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                <h3 style="color: ${config.color}; font-size: 18px; font-weight: 600; margin: 0 0 10px 0;">${config.title}</h3>
+                <p style="color: #374151; font-size: 16px; line-height: 1.6; margin: 0 0 10px 0;">
+                  ${config.message}
+                </p>
+                <p style="color: #374151; font-size: 16px; font-weight: 600; margin: 10px 0 0 0;">
+                  Dispute ID: #${data.disputeId}
+                </p>
+                <p style="color: #6b7280; font-size: 14px; margin: 10px 0 0 0;">
+                  Reason: ${data.reason}
+                </p>
+              </div>
+
+              <p style="color: #6b7280; font-size: 14px; line-height: 1.6; margin: 30px 0 0 0;">
+                If you have any questions about this dispute, please contact our support team.
               </p>
-              
-              <!-- Dispute Details Card -->
-              <div style="background-color: ${config.bgColor};  ${config.borderColor}; padding: 24px; border-radius: 12px; margin: 24px 0;">
-                <div style="display: flex; align-items: center; margin-bottom: 16px;">
-                  <div style="width: 8px; height: 8px; background-color: ${config.color}; border-radius: 50%; margin-right: 12px;"></div>
-                  <h3 style="margin: 0; color: #1e293b; font-size: 18px; font-weight: 600;">Dispute Details</h3>
-                </div>
-                <div style="display: grid; gap: 12px;">
-                  <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span style="color: #64748b; font-weight: 500;">Dispute ID:</span>
-                    <span style="color: #1e293b; font-weight: 600; font-family: monospace;">#${data.disputeId}</span>
-                  </div>
-                  <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span style="color: #64748b; font-weight: 500;">Reason:</span>
-                    <span style="color: #1e293b; font-weight: 600;">${data.reason}</span>
-                  </div>
-                  <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span style="color: #64748b; font-weight: 500;">Status:</span>
-                    <span style="color: ${config.color}; font-weight: 600; text-transform: uppercase; font-size: 14px;">${data.status}</span>
-                  </div>
-                </div>
-              </div>
-              
-              <!-- Action Button -->
-              <div style="text-align: center; margin: 32px 0;">
-                <a href="${process.env.FRONTEND_URL}/disputes" 
-                   style="background: #2563eb; color: #ffffff !important; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; display: inline-block;">
-                  View Dispute Details
-                </a>
-              </div>
-              
-              ${data.status === 'created' ? `
-                <!-- Help Section for New Disputes -->
-                <div style="background-color: #f0f9ff;  #bae6fd; padding: 20px; border-radius: 8px; margin: 24px 0;">
-                  <h4 style="color: #0369a1; margin: 0 0 12px 0; font-size: 16px; font-weight: 600;">What happens next?</h4>
-                  <p style="color: #0c4a6e; margin: 0 0 12px 0; font-size: 14px; line-height: 1.5;">
-                    Our team will review this dispute and get back to you within 24-48 hours. You'll receive updates via email.
-                  </p>
-                  <a href="${process.env.FRONTEND_URL}/support" 
-                     style="color: #0369a1; font-weight: 600; font-size: 14px; text-decoration: none;">
-                    Contact Support →
-                  </a>
-                </div>
-              ` : ''}
             </div>
-            
+
             <!-- Footer -->
-            <div style="background-color: #f8fafc; padding: 24px 30px; ">
-              <p style="color: #64748b; margin: 0; font-size: 14px; text-align: center;">
-                This email was sent by <strong>Mentr</strong> - Your trusted mentorship platform
-              </p>
-              <p style="color: #94a3b8; margin: 8px 0 0 0; font-size: 12px; text-align: center;">
+            <div style="background: #f9fafb; padding: 20px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="color: #6b7280; font-size: 12px; margin: 0;">
                 © 2024 Mentr. All rights reserved.
               </p>
             </div>
@@ -749,34 +681,6 @@ class EmailService {
       `
     };
   }
-
-  /**
-   * Send generic email
-   */
-  async sendGenericEmail(to: string, subject: string, message: string): Promise<boolean> {
-    try {
-      await resend.emails.send({
-        from: this.fromEmail,
-        to: Array.isArray(to) ? to : [to],
-        subject,
-        html: `
-          <div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif;">
-            <h1 style="color: #333; text-align: center;">${subject}</h1>
-            <p style="color: #666; font-size: 16px; line-height: 1.6;">${message}</p>
-            <p style="color: #666; font-size: 14px; text-align: center;">
-              Best regards,<br>The Mentr Team
-            </p>
-          </div>
-        `
-      });
-
-      return true;
-    } catch (error) {
-      console.error('Error sending generic email:', error);
-      return false;
-    }
-  }
 }
 
-export const emailService = new EmailService();
-export default emailService;
+export default new EmailService();

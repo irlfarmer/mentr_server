@@ -1,7 +1,7 @@
 import { Notification, INotification } from '../models/Notification';
 import { NotificationPreferences, INotificationPreferences } from '../models/NotificationPreferences';
 import { User } from '../models/User';
-import { emailService } from './emailService';
+import emailService from './emailService';
 import { NotificationPreferencesService } from './notificationPreferencesService';
 import mongoose from 'mongoose';
 

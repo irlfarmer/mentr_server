@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { User } from '../models/User';
-import { emailService } from '../services/emailService';
+import emailService from '../services/emailService';
 import crypto from 'crypto';
 
 // Generate verification token
