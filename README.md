@@ -1,4 +1,4 @@
-cd # Mentr Backend Server
+# Mentr Backend Server
 
 A Node.js/Express backend server for the Mentr mentorship marketplace platform, built with TypeScript and MongoDB.
 
