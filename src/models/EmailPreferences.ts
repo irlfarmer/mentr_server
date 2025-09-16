@@ -46,8 +46,7 @@ const EmailPreferencesSchema = new Schema<IEmailPreferences>({
   unsubscribeToken: {
     type: String,
     required: true,
-    unique: true,
-    index: true
+    unique: true
   },
   unsubscribeDate: {
     type: Date
@@ -116,7 +115,6 @@ const EmailPreferencesSchema = new Schema<IEmailPreferences>({
 
 // Index for efficient queries
 EmailPreferencesSchema.index({ email: 1, isActive: 1 });
-EmailPreferencesSchema.index({ unsubscribeToken: 1 });
 EmailPreferencesSchema.index({ isUnsubscribed: 1, isActive: 1 });
 
 export const EmailPreferences = mongoose.model<IEmailPreferences>('EmailPreferences', EmailPreferencesSchema);
