@@ -42,7 +42,7 @@ class DisputeNotificationService {
       await notificationService.createMultiTypeNotification(
         data.mentorId,
         'dispute',
-        'New Dispute Filed ⚠️',
+        'New Dispute Filed',
         `${mentee.firstName} ${mentee.lastName} has filed a dispute for your session "${(booking.serviceId as any)?.title || 'Session'}" (${sessionDate}). Reason: ${reasonText}. Please respond within 48 hours.`,
         {
           disputeId: data.disputeId,
@@ -93,7 +93,7 @@ class DisputeNotificationService {
       await notificationService.createMultiTypeNotification(
         data.menteeId,
         'dispute',
-        'Mentor Responded to Dispute 💬',
+        'Mentor Responded to Dispute',
         `${mentor.firstName} ${mentor.lastName} has responded to your dispute for session "${(booking.serviceId as any)?.title || 'Session'}" (${sessionDate}). Response: "${responsePreview}"`,
         {
           disputeId: data.disputeId,
@@ -137,7 +137,7 @@ class DisputeNotificationService {
         await notificationService.createMultiTypeNotification(
           data.menteeId,
           'dispute',
-          'Dispute Resolved ✅',
+          'Dispute Resolved',
           `Your dispute for session "${(booking.serviceId as any)?.title || 'Session'}" (${sessionDate}) has been resolved. Decision: ${decisionText}. ${refundText}.`,
           {
             disputeId: data.disputeId,
@@ -165,7 +165,7 @@ class DisputeNotificationService {
         await notificationService.createMultiTypeNotification(
           data.mentorId,
           'dispute',
-          'Dispute Resolved ✅',
+          'Dispute Resolved',
           `The dispute for your session "${(booking.serviceId as any)?.title || 'Session'}" (${sessionDate}) has been resolved. Decision: ${decisionText}. ${refundText}.`,
           {
             disputeId: data.disputeId,
@@ -211,7 +211,7 @@ class DisputeNotificationService {
         await notificationService.createMultiTypeNotification(
           data.menteeId,
           'dispute',
-          'Dispute Dismissed ❌',
+          'Dispute Dismissed',
           `Your dispute for session "${(booking.serviceId as any)?.title || 'Session'}" (${sessionDate}) has been dismissed. Reason: ${data.adminReason || 'No reason provided'}.`,
           {
             disputeId: data.disputeId,
@@ -236,7 +236,7 @@ class DisputeNotificationService {
         await notificationService.createMultiTypeNotification(
           data.mentorId,
           'dispute',
-          'Dispute Dismissed ✅',
+          'Dispute Dismissed',
           `The dispute for your session "${(booking.serviceId as any)?.title || 'Session'}" (${sessionDate}) has been dismissed. The dispute was found to be invalid.`,
           {
             disputeId: data.disputeId,
@@ -343,7 +343,7 @@ class DisputeNotificationService {
         await notificationService.createMultiTypeNotification(
           data.mentorId,
           'dispute',
-          'Dispute Response Reminder ⏰',
+          'Dispute Response Reminder',
           `Reminder: You have 24 hours to respond to the dispute for session "${(booking.serviceId as any)?.title || 'Session'}" (${sessionDate}). Please respond to avoid escalation to admin review.`,
           {
             disputeId: data.disputeId,
@@ -385,7 +385,7 @@ class DisputeNotificationService {
       await notificationService.createMultiTypeNotification(
         'admin', // This could be a special admin user ID or handled differently
         'dispute',
-        'New Dispute Requires Review ⚠️',
+        'New Dispute Requires Review',
         `New dispute filed by ${mentee.firstName} ${mentee.lastName} against ${mentor.firstName} ${mentor.lastName} for session "${(booking.serviceId as any)?.title || 'Session'}" (${sessionDate}). Reason: ${reasonText}.`,
         {
           disputeId: data.disputeId,

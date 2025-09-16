@@ -37,7 +37,7 @@ class PayoutNotificationService {
       await notificationService.createMultiTypeNotification(
         data.mentorId,
         'payout',
-        'Payout Successful! 💰',
+        'Payout Successful!',
         `Great news! Your payout of $${data.amount.toFixed(2)} has been successfully transferred to your account${bookingDetails}.`,
         {
           payoutId: data.payoutId,
@@ -71,7 +71,7 @@ class PayoutNotificationService {
       await notificationService.createMultiTypeNotification(
         data.mentorId,
         'payout',
-        'Payout Failed ❌',
+        'Payout Failed',
         `We were unable to process your payout of $${data.amount.toFixed(2)}.${failureMessage}`,
         {
           payoutId: data.payoutId,
@@ -155,7 +155,7 @@ class PayoutNotificationService {
       await notificationService.createMultiTypeNotification(
         data.mentorId,
         'payout',
-        'Payout Initiated 🚀',
+        'Payout Initiated',
         `Your payout of $${data.amount.toFixed(2)} has been initiated${bookingDetails}. It will be processed after the 48-hour dispute period.`,
         {
           payoutId: data.payoutId,
@@ -195,7 +195,7 @@ class PayoutNotificationService {
       await notificationService.createMultiTypeNotification(
         mentorId,
         'payout',
-        `${periodText.charAt(0).toUpperCase() + periodText.slice(1)}ly Payout Summary 📊`,
+        `${periodText.charAt(0).toUpperCase() + periodText.slice(1)}ly Payout Summary`,
         `Here's your ${periodText}ly earnings summary: $${summary.totalAmount.toFixed(2)} earned from ${summary.sessionCount} session${summary.sessionCount !== 1 ? 's' : ''} across ${summary.payoutCount} payout${summary.payoutCount !== 1 ? 's' : ''} (${periodRange}).`,
         {
           period,
@@ -226,7 +226,7 @@ class PayoutNotificationService {
       await notificationService.createMultiTypeNotification(
         mentorId,
         'payout',
-        'Earnings Milestone Reached! 🎉',
+        'Earnings Milestone Reached!',
         `Congratulations! You've reached $${currentEarnings.toFixed(2)} in total earnings. Keep up the great work!`,
         {
           threshold,
@@ -253,7 +253,7 @@ class PayoutNotificationService {
       await notificationService.createMultiTypeNotification(
         data.mentorId,
         'payout',
-        'Payout Delayed ⚠️',
+        'Payout Delayed',
         `Your payout of $${data.amount.toFixed(2)} has been delayed. Reason: ${delayReason}. We're working to resolve this as soon as possible.`,
         {
           payoutId: data.payoutId,

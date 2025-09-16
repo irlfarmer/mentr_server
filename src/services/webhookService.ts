@@ -42,7 +42,7 @@ export class WebhookService {
         await notificationService.createMultiTypeNotification(
           booking.studentId.toString(),
           'booking',
-          'Payment Successful ✅',
+          'Payment Successful',
           `Your payment of $${(paymentIntent.amount / 100).toFixed(2)} for the session has been processed successfully.`,
           {
             bookingId: (booking._id as any).toString(),
@@ -88,7 +88,7 @@ export class WebhookService {
         await notificationService.createMultiTypeNotification(
           booking.studentId.toString(),
           'booking',
-          'Payment Failed ❌',
+          'Payment Failed',
           `Your payment of $${(paymentIntent.amount / 100).toFixed(2)} for the session could not be processed. Please try again.`,
           {
             bookingId: (booking._id as any).toString(),
@@ -265,7 +265,7 @@ export class WebhookService {
         await notificationService.createMultiTypeNotification(
           (user._id as any).toString(),
           'system',
-          'Stripe Connect Account Deauthorized ⚠️',
+          'Stripe Connect Account Deauthorized',
           'Your Stripe Connect account has been deauthorized. You will need to reconnect your account to receive payouts.',
           {
             accountId: account.id,
@@ -302,9 +302,9 @@ export class WebhookService {
     };
 
     if (success) {
-      console.log('✅ Webhook processed successfully:', JSON.stringify(logData, null, 2));
+      console.log('Webhook processed successfully:', JSON.stringify(logData, null, 2));
     } else {
-      console.error('❌ Webhook processing failed:', JSON.stringify(logData, null, 2));
+      console.error('Webhook processing failed:', JSON.stringify(logData, null, 2));
     }
   }
 

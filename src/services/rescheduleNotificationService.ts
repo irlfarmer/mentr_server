@@ -45,7 +45,7 @@ class RescheduleNotificationService {
       await notificationService.createMultiTypeNotification(
         data.requestedTo,
         'reschedule',
-        'New Reschedule Request 📅',
+        'New Reschedule Request',
         `${requester.firstName} ${requester.lastName} has requested to reschedule your session "${serviceTitle}" from ${oldDate} at ${oldTime} to ${newDate} at ${newTime}.${reasonText}`,
         {
           rescheduleRequestId: data.rescheduleRequestId,
@@ -98,7 +98,7 @@ class RescheduleNotificationService {
       await notificationService.createMultiTypeNotification(
         data.requestedBy,
         'reschedule',
-        'Reschedule Request Approved ✅',
+        'Reschedule Request Approved',
         `${approver.firstName} ${approver.lastName} has approved your reschedule request for session "${serviceTitle}". New time: ${newDate} at ${newTime}.${responseText}`,
         {
           rescheduleRequestId: data.rescheduleRequestId,
@@ -148,7 +148,7 @@ class RescheduleNotificationService {
       await notificationService.createMultiTypeNotification(
         data.requestedBy,
         'reschedule',
-        'Reschedule Request Rejected ❌',
+        'Reschedule Request Rejected',
         `${rejector.firstName} ${rejector.lastName} has rejected your reschedule request for session "${serviceTitle}". The session remains scheduled for ${oldDate} at ${oldTime}.${responseText}`,
         {
           rescheduleRequestId: data.rescheduleRequestId,
@@ -198,7 +198,7 @@ class RescheduleNotificationService {
       await notificationService.createMultiTypeNotification(
         data.requestedTo,
         'reschedule',
-        'Reschedule Request Reminder ⏰',
+        'Reschedule Request Reminder',
         `Reminder: You have a pending reschedule request from ${requester.firstName} ${requester.lastName} for session "${serviceTitle}" to ${newDate} at ${newTime}. Please respond soon.`,
         {
           rescheduleRequestId: data.rescheduleRequestId,
@@ -322,7 +322,7 @@ class RescheduleNotificationService {
       await notificationService.createMultiTypeNotification(
         userId,
         'reschedule',
-        `${periodText.charAt(0).toUpperCase() + periodText.slice(1)}ly Reschedule Summary 📊`,
+        `${periodText.charAt(0).toUpperCase() + periodText.slice(1)}ly Reschedule Summary`,
         `Here's your ${periodText}ly reschedule activity: ${summary.totalRequests} total requests (${summary.approvedRequests} approved, ${summary.rejectedRequests} rejected, ${summary.pendingRequests} pending) for the period ${periodRange}.`,
         {
           period,
@@ -367,7 +367,7 @@ class RescheduleNotificationService {
       await notificationService.createMultiTypeNotification(
         data.requestedTo,
         'reschedule',
-        'Reschedule Request Expiring Soon ⚠️',
+        'Reschedule Request Expiring Soon',
         `Warning: The reschedule request from ${requester.firstName} ${requester.lastName} for session "${serviceTitle}" to ${newDate} at ${newTime} will be auto-approved in 2 hours if no response is given.`,
         {
           rescheduleRequestId: data.rescheduleRequestId,

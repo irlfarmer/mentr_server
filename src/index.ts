@@ -184,9 +184,9 @@ io.on('connection', (socket: any) => {
 
 // Start server
 server.listen(PORT, () => {
-  console.log(`🚀 Mentr Server running on port ${PORT}`);
-  console.log(`📊 Health check: http://localhost:${PORT}/health`);
-  console.log(`🔗 API Base URL: http://localhost:${PORT}/api`);
+  console.log(`Mentr Server running on port ${PORT}`);
+  console.log(`Health check: http://localhost:${PORT}/health`);
+  console.log(`API Base URL: http://localhost:${PORT}/api`);
   
   // Start cron jobs for automatic payouts
   CronService.startCronJobs();

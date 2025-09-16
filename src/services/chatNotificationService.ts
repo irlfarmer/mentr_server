@@ -64,13 +64,12 @@ class ChatNotificationService {
         message += ` (Paid: $${data.paymentAmount.toFixed(2)})`;
       }
 
-      await notificationService.createNotification({
-        userId: data.receiverId,
-        type: 'in_app',
-        category: 'chat',
+      await notificationService.createMultiTypeNotification(
+        data.receiverId,
+        'chat',
         title,
         message,
-        data: {
+        {
           senderId: data.senderId,
           senderName: `${sender.firstName} ${sender.lastName}`,
           senderProfileImage: sender.profileImage,
@@ -85,9 +84,8 @@ class ChatNotificationService {
           paymentAmount: data.paymentAmount,
           timestamp: new Date()
         },
-        priority,
-        sendImmediately: true
-      });
+        priority
+      );
     } catch (error) {
       console.error('Error sending new message notification:', error);
       throw error;
@@ -113,7 +111,7 @@ class ChatNotificationService {
       await notificationService.createMultiTypeNotification(
         senderId,
         'chat',
-        'Message Read ✅',
+        'Message Read',
         `${receiver.firstName} ${receiver.lastName} read your message`,
         {
           receiverId,
@@ -188,8 +186,8 @@ class ChatNotificationService {
       }
 
       const title = data.messageType === 'cold' 
-        ? 'New Cold Message Conversation 💬' 
-        : 'New Conversation Started 💬';
+        ? 'New Cold Message Conversation' 
+        : 'New Conversation Started';
 
       const message = data.messageType === 'cold'
         ? `${sender.firstName} ${sender.lastName} started a conversation with you: "${data.content.substring(0, 100)}${data.content.length > 100 ? '...' : ''}"`
@@ -274,7 +272,7 @@ class ChatNotificationService {
       await notificationService.createMultiTypeNotification(
         senderId,
         'chat',
-        'Message Failed ❌',
+        'Message Failed',
         `Failed to send message to ${receiver.firstName} ${receiver.lastName}: ${reason}`,
         {
           receiverId,
@@ -346,7 +344,7 @@ class ChatNotificationService {
       await notificationService.createMultiTypeNotification(
         senderId,
         'chat',
-        'Payment Successful ✅',
+        'Payment Successful',
         `Payment of $${amount.toFixed(2)} processed. Your message to ${receiver.firstName} ${receiver.lastName} was sent successfully.`,
         {
           receiverId,
@@ -391,7 +389,7 @@ class ChatNotificationService {
       await notificationService.createMultiTypeNotification(
         userId,
         'chat',
-        `${periodText.charAt(0).toUpperCase() + periodText.slice(1)}ly Chat Summary 📊`,
+        `${periodText.charAt(0).toUpperCase() + periodText.slice(1)}ly Chat Summary`,
         `You had ${summary.messageCount} messages in ${summary.conversationCount} conversations${summary.newConversations > 0 ? ` (${summary.newConversations} new)` : ''} this ${periodText} (${periodRange}).`,
         {
           period,
