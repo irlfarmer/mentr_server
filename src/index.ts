@@ -50,7 +50,10 @@ const app = express();
 const server = createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: process.env.CLIENT_URL || 'http://localhost:3000',
+    origin: [
+      process.env.CLIENT_URL || 'http://localhost:3000',
+      process.env.SERVER_URL || 'http://localhost:5000'
+    ],
     methods: ['GET', 'POST']
   }
 });
@@ -66,7 +69,10 @@ connectDB();
 // Middleware
 app.use(helmet());
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:3000',
+  origin: [
+    process.env.CLIENT_URL || 'http://localhost:3000',
+    process.env.SERVER_URL || 'http://localhost:5000'
+  ],
   credentials: true
 }));
 
