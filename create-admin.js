@@ -62,7 +62,7 @@ const askPassword = (question) => {
           process.stdin.setRawMode(false);
           process.stdin.pause();
           process.stdin.removeAllListeners('data');
-          console.log(); // New line
+          
           resolve(password);
           break;
         case '\u0003': // Ctrl-C

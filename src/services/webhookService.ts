@@ -2,6 +2,7 @@ import { User } from '../models/User';
 import { Booking } from '../models/Booking';
 import { notificationService } from './notificationService';
 import { payoutNotificationService } from './payoutNotificationService';
+import { bookingNotificationService } from './bookingNotificationService';
 
 export interface WebhookEvent {
   id: string;
@@ -18,45 +19,73 @@ export class WebhookService {
     try {
       const bookingId = paymentIntent.metadata?.bookingId;
       if (!bookingId) {
-        console.log('No booking ID found in payment intent metadata');
+        return;
+      }
+
+      // Skip processing for temporary IDs (amount-based payments)
+      if (bookingId.startsWith('temp_')) {
+        console.log(`Skipping webhook processing for temporary booking ID: ${bookingId}`);
         return;
       }
 
       // Update booking status
       const booking = await Booking.findById(bookingId);
       if (!booking) {
-        console.log('Booking not found:', bookingId);
+        console.log(`Booking not found for ID: ${bookingId}`);
         return;
       }
 
       // Only update if not already paid
       if (booking.paymentStatus !== 'paid') {
         booking.paymentStatus = 'paid';
+        booking.status = 'confirmed'; // Update booking status to confirmed
         booking.stripePaymentIntentId = paymentIntent.id;
         await booking.save();
 
-        console.log(`Payment succeeded for booking ${bookingId}`);
 
         // Send payment success notification
         try {
-        await notificationService.createMultiTypeNotification(
-          booking.studentId.toString(),
-          'booking',
-          'Payment Successful',
-          `Your payment of $${(paymentIntent.amount / 100).toFixed(2)} for the session has been processed successfully.`,
-          {
-            bookingId: (booking._id as any).toString(),
-            paymentIntentId: paymentIntent.id,
-            amount: paymentIntent.amount / 100,
-            status: 'paid'
-          }
-        );
+          await notificationService.createMultiTypeNotification(
+            booking.studentId.toString(),
+            'booking',
+            'Payment Successful',
+            `Your payment of $${(paymentIntent.amount / 100).toFixed(2)} for the session has been processed successfully.`,
+            {
+              bookingId: (booking._id as any).toString(),
+              paymentIntentId: paymentIntent.id,
+              amount: paymentIntent.amount / 100,
+              status: 'paid'
+            }
+          );
         } catch (notificationError) {
-          console.error('Error sending payment success notification:', notificationError);
+          // Don't fail webhook processing if notifications fail
+        }
+
+        // Send booking notifications after payment confirmation
+        try {
+          await bookingNotificationService.sendNewBookingNotification({
+            bookingId: (booking._id as any).toString(),
+            menteeId: booking.studentId.toString(),
+            mentorId: booking.mentorId.toString(),
+            serviceId: booking.serviceId.toString(),
+            bookingDate: booking.scheduledAt,
+            meetingLink: `${process.env.FRONTEND_URL}/video-call/${(booking._id as any).toString()}`
+          });
+
+          // Schedule reminder notifications using UTC time
+          await bookingNotificationService.scheduleReminderNotifications({
+            bookingId: (booking._id as any).toString(),
+            menteeId: booking.studentId.toString(),
+            mentorId: booking.mentorId.toString(),
+            serviceId: booking.serviceId.toString(),
+            bookingDate: booking.scheduledAtUTC,
+            meetingLink: `${process.env.FRONTEND_URL}/video-call/${(booking._id as any).toString()}`
+          });
+        } catch (notificationError) {
+          // Don't fail webhook processing if notifications fail
         }
       }
     } catch (error) {
-      console.error('Error processing payment intent succeeded:', error);
       throw error;
     }
   }
@@ -66,14 +95,19 @@ export class WebhookService {
     try {
       const bookingId = paymentIntent.metadata?.bookingId;
       if (!bookingId) {
-        console.log('No booking ID found in payment intent metadata');
+        return;
+      }
+
+      // Skip processing for temporary IDs (amount-based payments)
+      if (bookingId.startsWith('temp_')) {
+        console.log(`Skipping webhook processing for temporary booking ID: ${bookingId}`);
         return;
       }
 
       // Update booking status
       const booking = await Booking.findById(bookingId);
       if (!booking) {
-        console.log('Booking not found:', bookingId);
+        console.log(`Booking not found for ID: ${bookingId}`);
         return;
       }
 
@@ -81,7 +115,6 @@ export class WebhookService {
       booking.stripePaymentIntentId = paymentIntent.id;
       await booking.save();
 
-      console.log(`Payment failed for booking ${bookingId}`);
 
       // Send payment failure notification
       try {
@@ -99,10 +132,8 @@ export class WebhookService {
           }
         );
       } catch (notificationError) {
-        console.error('Error sending payment failure notification:', notificationError);
       }
     } catch (error) {
-      console.error('Error processing payment intent failed:', error);
       throw error;
     }
   }
@@ -110,12 +141,10 @@ export class WebhookService {
   // Process transfer created event (successful payout)
   static async processTransferCreated(transfer: any): Promise<void> {
     try {
-      console.log(`Transfer created: ${transfer.id} for $${(transfer.amount / 100).toFixed(2)}`);
 
       // Find bookings with this transfer ID
       const bookings = await Booking.find({ stripeTransferId: transfer.id });
       if (bookings.length === 0) {
-        console.log('No bookings found for transfer:', transfer.id);
         return;
       }
 
@@ -138,10 +167,8 @@ export class WebhookService {
           bookingIds: bookings.map(b => (b._id as any).toString())
         });
       } catch (notificationError) {
-        console.error('Error sending payout success notification:', notificationError);
       }
     } catch (error) {
-      console.error('Error processing transfer created:', error);
       throw error;
     }
   }
@@ -149,12 +176,10 @@ export class WebhookService {
   // Process transfer failed event (failed payout)
   static async processTransferFailed(transfer: any): Promise<void> {
     try {
-      console.log(`Transfer failed: ${transfer.id}`);
 
       // Find bookings with this transfer ID
       const bookings = await Booking.find({ stripeTransferId: transfer.id });
       if (bookings.length === 0) {
-        console.log('No bookings found for transfer:', transfer.id);
         return;
       }
 
@@ -178,10 +203,8 @@ export class WebhookService {
           bookingIds: bookings.map(b => (b._id as any).toString())
         });
       } catch (notificationError) {
-        console.error('Error sending payout failure notification:', notificationError);
       }
     } catch (error) {
-      console.error('Error processing transfer failed:', error);
       throw error;
     }
   }
@@ -189,12 +212,10 @@ export class WebhookService {
   // Process Connect account updated event
   static async processAccountUpdated(account: any): Promise<void> {
     try {
-      console.log(`Account updated: ${account.id}`);
 
       // Find user with this Connect account
       const user = await User.findOne({ 'stripeConnect.accountId': account.id });
       if (!user) {
-        console.log('User not found for account:', account.id);
         return;
       }
 
@@ -230,11 +251,9 @@ export class WebhookService {
             }
           );
         } catch (notificationError) {
-          console.error('Error sending account update notification:', notificationError);
         }
       }
     } catch (error) {
-      console.error('Error processing account updated:', error);
       throw error;
     }
   }
@@ -242,12 +261,10 @@ export class WebhookService {
   // Process Connect account deauthorized event
   static async processAccountDeauthorized(account: any): Promise<void> {
     try {
-      console.log(`Account deauthorized: ${account.id}`);
 
       // Find user with this Connect account
       const user = await User.findOne({ 'stripeConnect.accountId': account.id });
       if (!user) {
-        console.log('User not found for account:', account.id);
         return;
       }
 
@@ -274,10 +291,8 @@ export class WebhookService {
           }
         );
       } catch (notificationError) {
-        console.error('Error sending deauthorization notification:', notificationError);
       }
     } catch (error) {
-      console.error('Error processing account deauthorized:', error);
       throw error;
     }
   }
@@ -301,17 +316,11 @@ export class WebhookService {
       }
     };
 
-    if (success) {
-      console.log('Webhook processed successfully:', JSON.stringify(logData, null, 2));
-    } else {
-      console.error('Webhook processing failed:', JSON.stringify(logData, null, 2));
-    }
   }
 
   // Validate webhook event data
   static validateWebhookEvent(event: any): boolean {
     if (!event || !event.type || !event.data || !event.data.object) {
-      console.error('Invalid webhook event structure');
       return false;
     }
 

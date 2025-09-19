@@ -7,7 +7,6 @@ export class NotificationPreferencesService {
     try {
       return await NotificationPreferences.findOne({ userId });
     } catch (error) {
-      console.error('Error getting user notification preferences:', error);
       return null;
     }
   }
@@ -51,7 +50,6 @@ export class NotificationPreferencesService {
 
       return false;
     } catch (error) {
-      console.error('Error checking notification preferences:', error);
       // Default to allowing notifications if there's an error
       return true;
     }
@@ -85,7 +83,6 @@ export class NotificationPreferencesService {
         return currentTime >= startTime && currentTime < endTime;
       }
     } catch (error) {
-      console.error('Error checking quiet hours:', error);
       return false;
     }
   }
@@ -103,7 +100,6 @@ export class NotificationPreferencesService {
 
       return preferences.frequency[type] || false;
     } catch (error) {
-      console.error('Error checking frequency preferences:', error);
       return true;
     }
   }
@@ -168,7 +164,6 @@ export class NotificationPreferencesService {
         }
       };
     } catch (error) {
-      console.error('Error getting notification settings:', error);
       return {
         canReceive: true,
         channels: {
@@ -238,7 +233,6 @@ export class NotificationPreferencesService {
       await preferences.save();
       return preferences;
     } catch (error) {
-      console.error('Error creating default preferences:', error);
       throw error;
     }
   }
@@ -252,7 +246,6 @@ export class NotificationPreferencesService {
         { upsert: true }
       );
     } catch (error) {
-      console.error('Error updating user timezone:', error);
       throw error;
     }
   }
@@ -270,7 +263,6 @@ export class NotificationPreferencesService {
       const preferences = await NotificationPreferences.find(query).select('userId');
       return preferences.map(p => p.userId.toString());
     } catch (error) {
-      console.error('Error getting users with preferences:', error);
       return [];
     }
   }

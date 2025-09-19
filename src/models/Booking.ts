@@ -23,6 +23,19 @@ export interface IBooking extends Document {
   stripePaymentIntentId?: string;
   meetingUrl?: string;
   notes?: string;
+  cancellationPolicy: {
+    minimumCancellationHours: number; // Hours before session when cancellation is no longer allowed
+    mentorId: mongoose.Types.ObjectId; // Reference to mentor who set this policy
+    setAt: Date; // When this policy was set (at booking time)
+  };
+  refund?: {
+    status: 'none' | 'pending' | 'processed' | 'failed';
+    type: 'payment_method' | 'tokens';
+    amount: number;
+    stripeRefundId?: string;
+    processedAt?: Date;
+    reason?: string;
+  };
   createdAt: Date;
   updatedAt: Date;
 }
@@ -118,6 +131,48 @@ const BookingSchema = new Schema<IBooking>({
   notes: {
     type: String,
     maxlength: 1000
+  },
+  cancellationPolicy: {
+    minimumCancellationHours: {
+      type: Number,
+      required: true,
+      min: 1,
+      max: 168 // Max 1 week
+    },
+    mentorId: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    },
+    setAt: {
+      type: Date,
+      required: true,
+      default: Date.now
+    }
+  },
+  refund: {
+    status: {
+      type: String,
+      enum: ['none', 'pending', 'processed', 'failed'],
+      default: 'none'
+    },
+    type: {
+      type: String,
+      enum: ['payment_method', 'tokens']
+    },
+    amount: {
+      type: Number,
+      min: 0
+    },
+    stripeRefundId: {
+      type: String
+    },
+    processedAt: {
+      type: Date
+    },
+    reason: {
+      type: String
+    }
   }
 }, {
   timestamps: true

@@ -1,20 +1,8 @@
 import { Request, Response } from 'express';
 import { User } from '../models/User';
+import { TokenTransaction } from '../models/TokenTransaction';
 import { AuthRequest } from '../types';
 import { StripeService, CreatePaymentIntentParams } from '../services/stripeService';
-import mongoose from 'mongoose';
-
-// Token Transaction Schema
-const TokenTransactionSchema = new mongoose.Schema({
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  type: { type: String, enum: ['credit', 'debit'], required: true },
-  amount: { type: Number, required: true, min: 0 },
-  description: { type: String, required: true },
-  reference: { type: String },
-  createdAt: { type: Date, default: Date.now }
-});
-
-const TokenTransaction = mongoose.model('TokenTransaction', TokenTransactionSchema);
 
 // Get user's token balance and recent transactions
 export const getBalance = async (req: AuthRequest, res: Response): Promise<void> => {

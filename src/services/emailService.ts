@@ -49,7 +49,7 @@ export interface DisputeNotificationData {
 }
 
 class EmailService {
-  private readonly fromEmail = process.env.FROM_EMAIL || 'noreply@mentr.com';
+  private readonly fromEmail = process.env.FROM_EMAIL || 'noreply@yourdomain.com';
 
   /**
    * Add unsubscribe footer to email HTML
@@ -95,7 +95,6 @@ class EmailService {
       if (userId && category) {
         const shouldSend = await EmailPreferencesService.shouldSendEmail(userId, category);
         if (!shouldSend) {
-          console.log(`Email not sent to user ${userId} due to email preferences for category ${String(category)}`);
           return true; // Return true as it's not an error, just filtered out
         }
 
@@ -113,14 +112,10 @@ class EmailService {
       });
 
       if (error) {
-        console.error('Error sending email:', error);
         return false;
       }
-
-      console.log('Email sent successfully:', data);
       return true;
     } catch (error) {
-      console.error('Error in sendEmailWithPreferences:', error);
       return false;
     }
   }
@@ -134,7 +129,6 @@ class EmailService {
       
       return await this.sendEmailWithPreferences(to, subject, html, userId, 'verification');
     } catch (error) {
-      console.error('Error sending verification email:', error);
       return false;
     }
   }
@@ -148,7 +142,6 @@ class EmailService {
       
       return await this.sendEmailWithPreferences(to, subject, html, userId, 'system');
     } catch (error) {
-      console.error('Error sending password reset email:', error);
       return false;
     }
   }
@@ -162,7 +155,6 @@ class EmailService {
       
       return await this.sendEmailWithPreferences(to, subject, html, userId, 'booking');
     } catch (error) {
-      console.error('Error sending booking notification:', error);
       return false;
     }
   }
@@ -176,7 +168,6 @@ class EmailService {
       
       return await this.sendEmailWithPreferences(to, subject, html, userId, 'payout');
     } catch (error) {
-      console.error('Error sending payout notification:', error);
       return false;
     }
   }
@@ -190,7 +181,6 @@ class EmailService {
       
       return await this.sendEmailWithPreferences(to, subject, html, userId, 'dispute');
     } catch (error) {
-      console.error('Error sending dispute notification:', error);
       return false;
     }
   }
@@ -204,7 +194,6 @@ class EmailService {
       
       return await this.sendEmailWithPreferences(to, subject, html, userId, 'system');
     } catch (error) {
-      console.error('Error sending generic email:', error);
       return false;
     }
   }

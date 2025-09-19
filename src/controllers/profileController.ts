@@ -31,7 +31,6 @@ export const getProfile = async (req: AuthRequest, res: Response): Promise<void>
       message: 'Profile retrieved successfully'
     });
   } catch (error) {
-    console.error('Get profile error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error'
@@ -68,7 +67,6 @@ export const getPublicProfile = async (req: Request, res: Response): Promise<voi
       message: 'Public profile retrieved successfully'
     });
   } catch (error) {
-    console.error('Get public profile error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error'
@@ -166,7 +164,6 @@ export const updateAvailability = async (req: AuthRequest, res: Response): Promi
       message: 'Availability updated successfully'
     });
   } catch (error) {
-    console.error('Update availability error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error'
@@ -195,6 +192,7 @@ export const updateProfile = async (req: AuthRequest, res: Response): Promise<vo
       skills,
       hourlyRate,
       coldMessageRate,
+      minimumCancellationHours,
       availability,
       linkedinProfileUrl,
       // Professional fields
@@ -217,6 +215,7 @@ export const updateProfile = async (req: AuthRequest, res: Response): Promise<vo
     if (skills) updateData.skills = skills;
     if (hourlyRate !== undefined) updateData.hourlyRate = hourlyRate;
     if (coldMessageRate !== undefined) updateData.coldMessageRate = coldMessageRate;
+    if (minimumCancellationHours !== undefined) updateData.minimumCancellationHours = minimumCancellationHours;
     if (availability) updateData.availability = availability;
     if (linkedinProfileUrl) updateData.linkedinProfileUrl = linkedinProfileUrl;
     if (professionalHeadline) updateData.professionalHeadline = professionalHeadline;
@@ -323,7 +322,6 @@ export const updateProfile = async (req: AuthRequest, res: Response): Promise<vo
       message: 'Profile updated successfully'
     });
   } catch (error) {
-    console.error('Update profile error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error'
@@ -376,7 +374,6 @@ export const uploadProfileImage = async (req: AuthRequest, res: Response): Promi
       message: 'Profile image updated successfully'
     });
   } catch (error) {
-    console.error('Upload profile image error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error'
@@ -434,7 +431,6 @@ export const addDocument = async (req: AuthRequest, res: Response): Promise<void
       message: 'Document added successfully'
     });
   } catch (error) {
-    console.error('Add document error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error'
@@ -476,7 +472,6 @@ export const removeDocument = async (req: AuthRequest, res: Response): Promise<v
       message: 'Document removed successfully'
     });
   } catch (error) {
-    console.error('Remove document error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error'
@@ -520,7 +515,6 @@ export const getMentorAvailability = async (req: Request, res: Response): Promis
       message: 'Mentor availability retrieved successfully'
     });
   } catch (error) {
-    console.error('Get mentor availability error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error'
@@ -577,7 +571,6 @@ export const searchProfiles = async (req: Request, res: Response): Promise<void>
       message: 'Profiles retrieved successfully'
     });
   } catch (error) {
-    console.error('Search profiles error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error'

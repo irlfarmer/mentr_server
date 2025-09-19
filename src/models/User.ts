@@ -22,6 +22,7 @@ export interface IUserDocument extends Document {
   skills: string[];
   hourlyRate?: number;
   coldMessageRate?: number;
+  minimumCancellationHours?: number; // Minimum hours before session for cancellation
   // Professional fields
   professionalHeadline?: string;
   currentCompany?: string;
@@ -235,6 +236,12 @@ const UserSchema = new Schema<IUserDocument>({
     type: Number,
     min: 0,
     default: 0
+  },
+  minimumCancellationHours: {
+    type: Number,
+    min: 1,
+    max: 168, // Max 1 week
+    default: 24
   },
   // Professional fields
   professionalHeadline: {

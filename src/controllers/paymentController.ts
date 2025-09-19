@@ -10,6 +10,7 @@ export const createPaymentIntent = async (req: AuthRequest, res: Response): Prom
     const userId = (req.user as any)?._id;
     const { bookingId, amount, currency = 'usd' } = req.body;
 
+
     if (!userId) {
       res.status(401).json({
         success: false,
@@ -48,7 +49,11 @@ export const createPaymentIntent = async (req: AuthRequest, res: Response): Prom
       }
 
       // Check if user is authorized to pay for this booking
-      if (booking.studentId.toString() !== userId.toString()) {
+      // Handle both populated and non-populated studentId
+      const studentId = booking.studentId._id || booking.studentId;
+      const isAuthorized = studentId.toString() === userId.toString();
+      
+      if (!isAuthorized) {
         res.status(403).json({
           success: false,
           error: 'Not authorized to pay for this booking'

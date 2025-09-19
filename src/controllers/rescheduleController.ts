@@ -4,6 +4,7 @@ import RescheduleRequest from '../models/RescheduleRequest';
 import { Booking } from '../models/Booking';
 import { User } from '../models/User';
 import { rescheduleNotificationService } from '../services/rescheduleNotificationService';
+import { RefundService } from '../services/refundService';
 
 // Request a reschedule
 export const requestReschedule = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -103,7 +104,6 @@ export const requestReschedule = async (req: AuthRequest, res: Response): Promis
         status: 'pending'
       });
     } catch (notificationError) {
-      console.error('Error sending reschedule request notification:', notificationError);
       // Don't fail the reschedule request if notification fails
     }
 
@@ -113,7 +113,6 @@ export const requestReschedule = async (req: AuthRequest, res: Response): Promis
       message: 'Reschedule request submitted successfully'
     });
   } catch (error) {
-    console.error('Request reschedule error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error'
@@ -178,7 +177,6 @@ export const getRescheduleRequests = async (req: AuthRequest, res: Response): Pr
       data: requests
     });
   } catch (error) {
-    console.error('Get reschedule requests error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error'
@@ -317,7 +315,6 @@ export const respondToRescheduleRequest = async (req: AuthRequest, res: Response
       message: `Reschedule request ${action}d successfully`
     });
   } catch (error) {
-    console.error('Respond to reschedule request error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error'
@@ -368,10 +365,42 @@ export const cancelBooking = async (req: AuthRequest, res: Response): Promise<vo
       return;
     }
 
+    // Check cancellation time limit
+    const now = new Date();
+    const sessionTime = new Date(booking.scheduledAtUTC);
+    const hoursUntilSession = (sessionTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+    const minimumHours = booking.cancellationPolicy?.minimumCancellationHours || 24;
+
+    if (hoursUntilSession < minimumHours) {
+      res.status(400).json({
+        success: false,
+        error: `Booking cannot be cancelled less than ${minimumHours} hours before the session. You can cancel until ${new Date(sessionTime.getTime() - minimumHours * 60 * 60 * 1000).toLocaleString()}.`
+      });
+      return;
+    }
+
+    // Determine who cancelled and refund type
+    const isMentor = booking.mentorId.toString() === userId;
+    const cancelledBy = isMentor ? 'mentor' : 'mentee';
+    
+    // For mentee cancellations, check if they want refund in tokens or payment method
+    const refundType = req.body.refundType || (isMentor ? 'payment_method' : 'tokens');
+
     // Update booking status
     booking.status = 'cancelled';
     booking.notes = booking.notes ? `${booking.notes}\n\nCancelled by user. Reason: ${reason || 'No reason provided'}` : `Cancelled by user. Reason: ${reason || 'No reason provided'}`;
     await booking.save();
+
+    // Process refund
+    let refundResult = null;
+    if (booking.paymentStatus === 'paid') {
+      refundResult = await RefundService.processRefund({
+        bookingId: bookingId,
+        refundType: refundType as 'payment_method' | 'tokens',
+        reason: reason || 'Booking cancelled',
+        cancelledBy: cancelledBy
+      });
+    }
 
     // Cancel any pending reschedule requests
     await RescheduleRequest.updateMany(
@@ -387,10 +416,10 @@ export const cancelBooking = async (req: AuthRequest, res: Response): Promise<vo
     res.json({
       success: true,
       data: booking,
+      refund: refundResult,
       message: 'Booking cancelled successfully'
     });
   } catch (error) {
-    console.error('Cancel booking error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error'

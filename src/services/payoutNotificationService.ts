@@ -50,7 +50,6 @@ class PayoutNotificationService {
         'high'
       );
     } catch (error) {
-      console.error('Error sending payout success notification:', error);
       throw error;
     }
   }
@@ -84,7 +83,6 @@ class PayoutNotificationService {
         'urgent'
       );
     } catch (error) {
-      console.error('Error sending payout failure notification:', error);
       throw error;
     }
   }
@@ -126,7 +124,6 @@ class PayoutNotificationService {
         'medium'
       );
     } catch (error) {
-      console.error('Error sending payout pending notification:', error);
       throw error;
     }
   }
@@ -169,7 +166,6 @@ class PayoutNotificationService {
         'medium'
       );
     } catch (error) {
-      console.error('Error sending payout initiated notification:', error);
       throw error;
     }
   }
@@ -209,7 +205,6 @@ class PayoutNotificationService {
         'low'
       );
     } catch (error) {
-      console.error('Error sending payout summary notification:', error);
       throw error;
     }
   }
@@ -236,7 +231,6 @@ class PayoutNotificationService {
         'medium'
       );
     } catch (error) {
-      console.error('Error sending payout threshold notification:', error);
       throw error;
     }
   }
@@ -266,7 +260,6 @@ class PayoutNotificationService {
         'high'
       );
     } catch (error) {
-      console.error('Error sending payout delay notification:', error);
       throw error;
     }
   }

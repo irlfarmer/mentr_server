@@ -34,13 +34,11 @@ export class PayoutService {
         ]
       }).populate('mentorId', 'firstName lastName email');
 
-      console.log(`Found ${readyBookings.length} bookings ready for payout processing`);
 
       for (const booking of readyBookings) {
         await this.processBookingPayout(booking);
       }
     } catch (error) {
-      console.error('Error checking pending payouts:', error);
     }
   }
 
@@ -54,7 +52,6 @@ export class PayoutService {
       });
 
       if (activeDispute) {
-        console.log(`Booking ${booking._id} has active dispute, skipping payout`);
         await Booking.findByIdAndUpdate(booking._id, {
           payoutStatus: 'disputed',
           payoutProcessedAt: new Date()
@@ -129,13 +126,10 @@ export class PayoutService {
           bookingIds: [booking._id.toString()]
         });
       } catch (notificationError) {
-        console.error('Error sending payout success notification:', notificationError);
         // Don't fail the payout if notification fails
       }
 
-      console.log(`Processed payout for booking ${booking._id}: $${mentorPayout} to mentor, $${platformCommission} commission`);
     } catch (error) {
-      console.error(`Error processing payout for booking ${booking._id}:`, error);
       
       // Mark as failed
       await Booking.findByIdAndUpdate(booking._id, {
@@ -155,7 +149,6 @@ export class PayoutService {
           bookingIds: [booking._id.toString()]
         });
       } catch (notificationError) {
-        console.error('Error sending payout failure notification:', notificationError);
         // Don't fail the error handling if notification fails
       }
     }
@@ -172,14 +165,12 @@ export class PayoutService {
       // Get mentor's Stripe Connect account
       const mentor = await User.findById(mentorId);
       if (!mentor || !mentor.stripeConnect?.accountId) {
-        console.log(`Mentor ${mentorId} does not have a connected Stripe account, skipping payout`);
         return;
       }
 
       // Check if account is ready for payouts
       const isAccountReady = await StripeService.isAccountReady(mentor.stripeConnect.accountId);
       if (!isAccountReady) {
-        console.log(`Mentor ${mentorId} Stripe account is not ready for payouts, skipping payout`);
         return;
       }
 
@@ -217,13 +208,10 @@ export class PayoutService {
           payoutDate: new Date()
         });
       } catch (notificationError) {
-        console.error('Error sending cold message payout success notification:', notificationError);
         // Don't fail the payout if notification fails
       }
 
-      console.log(`Processed cold message payout: $${mentorPayout} to mentor ${mentorId}, $${platformCommission} commission, transfer: ${transfer.id}`);
     } catch (error) {
-      console.error(`Error processing cold message payout for mentor ${mentorId}:`, error);
       
       // Send payout failure notification
       try {
@@ -236,7 +224,6 @@ export class PayoutService {
           failureReason: (error as Error).message || 'Unknown error'
         });
       } catch (notificationError) {
-        console.error('Error sending cold message payout failure notification:', notificationError);
         // Don't fail the error handling if notification fails
       }
     }
@@ -264,7 +251,6 @@ export class PayoutService {
 
       return tierRates[tier] || 0.25;
     } catch (error) {
-      console.error('Error getting commission rate:', error);
       return 0.25; // Default fallback
     }
   }
@@ -293,7 +279,6 @@ export class PayoutService {
         failureReason: undefined
       }));
     } catch (error) {
-      console.error('Error getting mentor payout history:', error);
       return [];
     }
   }
@@ -340,7 +325,6 @@ export class PayoutService {
 
       return result;
     } catch (error) {
-      console.error('Error getting platform payout stats:', error);
       return {
         totalPayouts: 0,
         totalAmount: 0,
@@ -394,7 +378,6 @@ export class PayoutService {
         );
       }
     } catch (error) {
-      console.error('Error handling dispute resolution payout:', error);
     }
   }
 }

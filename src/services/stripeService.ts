@@ -60,7 +60,6 @@ export class StripeService {
         paymentIntentId: paymentIntent.id,
       };
     } catch (error) {
-      console.error('Stripe payment intent creation error:', error);
       throw new Error('Failed to create payment intent');
     }
   }
@@ -70,7 +69,6 @@ export class StripeService {
     try {
       return await stripe.paymentIntents.retrieve(paymentIntentId);
     } catch (error) {
-      console.error('Stripe payment intent retrieval error:', error);
       throw new Error('Failed to retrieve payment intent');
     }
   }
@@ -83,7 +81,6 @@ export class StripeService {
         name,
       });
     } catch (error) {
-      console.error('Stripe customer creation error:', error);
       throw new Error('Failed to create customer');
     }
   }
@@ -101,7 +98,6 @@ export class StripeService {
 
       return await stripe.refunds.create(refundParams);
     } catch (error) {
-      console.error('Stripe refund creation error:', error);
       throw new Error('Failed to create refund');
     }
   }
@@ -109,9 +105,17 @@ export class StripeService {
   // Verify webhook signature
   static verifyWebhookSignature(payload: string, signature: string, endpointSecret: string) {
     try {
-      return stripe.webhooks.constructEvent(payload, signature, endpointSecret);
-    } catch (error) {
-      console.error('Webhook signature verification error:', error);
+      console.log('Verifying webhook signature...');
+      console.log('Payload length:', payload.length);
+      console.log('Signature:', signature);
+      console.log('Endpoint secret present:', !!endpointSecret);
+      
+      const event = stripe.webhooks.constructEvent(payload, signature, endpointSecret);
+      console.log('Webhook signature verification successful');
+      return event;
+    } catch (error: any) {
+      console.error('Webhook signature verification error:', error.message);
+      console.error('Error type:', error.type);
       throw new Error('Invalid webhook signature');
     }
   }
@@ -148,7 +152,6 @@ export class StripeService {
         accountLink: accountLink.url,
       };
     } catch (error) {
-      console.error('Stripe Connect account creation error:', error);
       throw new Error('Failed to create Connect account');
     }
   }
@@ -158,7 +161,6 @@ export class StripeService {
     try {
       return await stripe.accounts.retrieve(accountId);
     } catch (error) {
-      console.error('Stripe Connect account retrieval error:', error);
       throw new Error('Failed to retrieve Connect account');
     }
   }
@@ -175,7 +177,6 @@ export class StripeService {
 
       return accountLink.url;
     } catch (error) {
-      console.error('Stripe account link creation error:', error);
       throw new Error('Failed to create account link');
     }
   }
@@ -193,7 +194,6 @@ export class StripeService {
 
       return transfer;
     } catch (error) {
-      console.error('Stripe transfer error:', error);
       throw new Error('Failed to transfer funds');
     }
   }
@@ -203,7 +203,6 @@ export class StripeService {
     try {
       return await stripe.transfers.retrieve(transferId);
     } catch (error) {
-      console.error('Stripe transfer retrieval error:', error);
       throw new Error('Failed to retrieve transfer');
     }
   }
@@ -214,7 +213,6 @@ export class StripeService {
       const account = await stripe.accounts.retrieve(accountId);
       return account.details_submitted && account.charges_enabled && account.payouts_enabled;
     } catch (error) {
-      console.error('Stripe account readiness check error:', error);
       return false;
     }
   }

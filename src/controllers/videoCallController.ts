@@ -29,8 +29,6 @@ export const createVideoCallRoom = async (req: AuthRequest, res: Response): Prom
       .populate('mentorId')
       .populate('studentId');
 
-
-
     if (!booking) {
       res.status(404).json({ success: false, error: 'Booking not found' });
       return;
@@ -40,13 +38,22 @@ export const createVideoCallRoom = async (req: AuthRequest, res: Response): Prom
     const mentorId = (booking.mentorId as any)?._id?.toString() || booking.mentorId.toString();
     const studentId = (booking.studentId as any)?._id?.toString() || booking.studentId.toString();
     
-
-    
     const isMentor = mentorId === userId;
     const isStudent = studentId === userId;
 
     if (!isMentor && !isStudent) {
       res.status(403).json({ success: false, error: 'Access denied' });
+      return;
+    }
+
+    // CRITICAL: Check payment status before allowing video call creation
+    if (booking.paymentStatus !== 'paid') {
+      res.status(403).json({ 
+        success: false, 
+        error: 'Payment required. Please complete payment before joining the video call.',
+        paymentRequired: true,
+        paymentStatus: booking.paymentStatus
+      });
       return;
     }
 
@@ -230,8 +237,24 @@ export const generateMeetingToken = async (req: AuthRequest, res: Response): Pro
       return;
     }
 
+    // CRITICAL: Check payment status before allowing meeting token generation
+    const booking = await Booking.findById(videoCall.bookingId);
+    if (!booking) {
+      res.status(404).json({ success: false, error: 'Associated booking not found' });
+      return;
+    }
+
+    if (booking.paymentStatus !== 'paid') {
+      res.status(403).json({ 
+        success: false, 
+        error: 'Payment required. Please complete payment before joining the video call.',
+        paymentRequired: true,
+        paymentStatus: booking.paymentStatus
+      });
+      return;
+    }
+
     // Verify user can join
-    
     if (!(videoCall as any).canJoin(userId)) {
       res.status(403).json({ success: false, error: 'Cannot join this call' });
       return;

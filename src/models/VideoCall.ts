@@ -15,6 +15,13 @@ export interface IVideoCall {
   recordingId?: string;
   transcriptionUrl?: string;
   notes?: string;
+  participants?: Array<{
+    id: string;
+    userName?: string;
+    userId?: string;
+    joinedAt?: Date;
+    leftAt?: Date;
+  }>;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -78,6 +85,13 @@ const VideoCallSchema = new Schema<IVideoCallDocument>(
     notes: {
       type: String,
     },
+    participants: [{
+      id: { type: String, required: true },
+      userName: { type: String },
+      userId: { type: String },
+      joinedAt: { type: Date },
+      leftAt: { type: Date }
+    }],
   },
   {
     timestamps: true,

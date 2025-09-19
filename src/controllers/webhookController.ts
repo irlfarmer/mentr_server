@@ -8,12 +8,19 @@ export class WebhookController {
     const sig = req.headers['stripe-signature'] as string;
     const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET!;
 
+    // Debug logging
+    console.log('Webhook signature:', sig);
+    console.log('Webhook endpoint secret:', endpointSecret ? 'Present' : 'Missing');
+    console.log('Request body type:', typeof req.body);
+    console.log('Request body length:', req.body ? req.body.length : 0);
+
     let event;
 
     try {
-      // Verify webhook signature
+      // Verify webhook signature - convert Buffer to string
+      const body = Buffer.isBuffer(req.body) ? req.body.toString() : req.body;
       event = StripeService.verifyWebhookSignature(
-        JSON.stringify(req.body),
+        body,
         sig,
         endpointSecret
       );
@@ -35,6 +42,11 @@ export class WebhookController {
 
       // Handle the event
       switch (event.type) {
+        case 'payment_intent.created':
+          console.log(`Payment intent created: ${event.data.object.id}`);
+          WebhookService.logWebhookEvent(event.type, event.id, event.data.object, true);
+          break;
+
         case 'payment_intent.succeeded':
           await WebhookService.processPaymentIntentSucceeded(event.data.object);
           WebhookService.logWebhookEvent(event.type, event.id, event.data.object, true);
@@ -42,6 +54,16 @@ export class WebhookController {
 
         case 'payment_intent.payment_failed':
           await WebhookService.processPaymentIntentFailed(event.data.object);
+          WebhookService.logWebhookEvent(event.type, event.id, event.data.object, true);
+          break;
+
+        case 'charge.succeeded':
+          console.log(`Charge succeeded: ${event.data.object.id}`);
+          WebhookService.logWebhookEvent(event.type, event.id, event.data.object, true);
+          break;
+
+        case 'charge.updated':
+          console.log(`Charge updated: ${event.data.object.id}`);
           WebhookService.logWebhookEvent(event.type, event.id, event.data.object, true);
           break;
 

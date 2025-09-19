@@ -9,6 +9,7 @@ import { MentorEarningsService } from '../services/mentorEarningsService';
 import { CommissionService } from '../services/commissionService';
 import { bookingNotificationService } from '../services/bookingNotificationService';
 import { payoutNotificationService } from '../services/payoutNotificationService';
+import { RefundService } from '../services/refundService';
 
 // Create a new booking
 export const createBooking = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -152,35 +153,19 @@ export const createBooking = async (req: AuthRequest, res: Response): Promise<vo
       studentTimezone: studentTz,
       duration,
       amount,
-      notes
+      notes,
+      cancellationPolicy: {
+        minimumCancellationHours: mentor.minimumCancellationHours || 24,
+        mentorId: service.mentorId,
+        setAt: new Date()
+      }
     });
 
     await booking.save();
 
-    // Send booking notifications
-    try {
-      await bookingNotificationService.sendNewBookingNotification({
-        bookingId: (booking._id as any).toString(),
-        menteeId: userId,
-        mentorId: service.mentorId.toString(),
-        serviceId: serviceId,
-        bookingDate: new Date(scheduledAt),
-        meetingLink: `${process.env.FRONTEND_URL}/video-call/${(booking._id as any).toString()}` // Generate meeting link
-      });
-
-      // Schedule reminder notifications using UTC time
-      await bookingNotificationService.scheduleReminderNotifications({
-        bookingId: (booking._id as any).toString(),
-        menteeId: userId,
-        mentorId: service.mentorId.toString(),
-        serviceId: serviceId,
-        bookingDate: scheduledAtUTC, // Use UTC time for accurate reminder calculations
-        meetingLink: `https://meet.mentr.com/${(booking._id as any).toString()}`
-      });
-    } catch (notificationError) {
-      console.error('Error sending booking notifications:', notificationError);
-      // Don't fail the booking creation if notifications fail
-    }
+    // NOTE: Booking notifications are now sent only after payment confirmation
+    // This prevents misleading notifications for unpaid bookings
+    // Notifications are sent in the webhook service when payment is confirmed
 
     // Populate service and user details for response
     await booking.populate([
@@ -195,7 +180,6 @@ export const createBooking = async (req: AuthRequest, res: Response): Promise<vo
       message: 'Booking created successfully'
     });
   } catch (error) {
-    console.error('Create booking error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error'
@@ -259,7 +243,6 @@ export const getBookings = async (req: AuthRequest, res: Response): Promise<void
       }
     });
   } catch (error) {
-    console.error('Get bookings error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error'
@@ -314,7 +297,6 @@ export const getBooking = async (req: AuthRequest, res: Response): Promise<void>
       data: booking
     });
   } catch (error) {
-    console.error('Get booking error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error'
@@ -386,6 +368,33 @@ export const updateBookingStatus = async (req: AuthRequest, res: Response): Prom
       return;
     }
 
+    // CRITICAL: Check payment status for status transitions that require payment
+    if ((status === 'confirmed' || status === 'completed') && booking.paymentStatus !== 'paid') {
+      res.status(403).json({
+        success: false,
+        error: 'Payment required before confirming or completing booking',
+        paymentRequired: true,
+        paymentStatus: booking.paymentStatus
+      });
+      return;
+    }
+
+    // Check cancellation time limit if cancelling
+    if (status === 'cancelled') {
+      const now = new Date();
+      const sessionTime = new Date(booking.scheduledAtUTC);
+      const hoursUntilSession = (sessionTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+      const minimumHours = booking.cancellationPolicy?.minimumCancellationHours || 24;
+
+      if (hoursUntilSession < minimumHours) {
+        res.status(400).json({
+          success: false,
+          error: `Booking cannot be cancelled less than ${minimumHours} hours before the session. You can cancel until ${new Date(sessionTime.getTime() - minimumHours * 60 * 60 * 1000).toLocaleString()}.`
+        });
+        return;
+      }
+    }
+
     // Update booking status
     
     booking.status = status;
@@ -422,7 +431,6 @@ export const updateBookingStatus = async (req: AuthRequest, res: Response): Prom
           );
           
           if (earningsResult.success) {
-            console.log(`Mentor ${mentor.firstName} ${mentor.lastName} earned $${mentorPayout.toFixed(2)} from session (Commission: $${commissionAmount.toFixed(2)}, Tier: ${earningsResult.newTier || currentTier})`);
             
             // Send payout initiated notification
             try {
@@ -435,13 +443,11 @@ export const updateBookingStatus = async (req: AuthRequest, res: Response): Prom
                 bookingIds: [(booking._id as any).toString()]
               });
             } catch (notificationError) {
-              console.error('Error sending payout initiated notification:', notificationError);
               // Don't fail the booking completion if notification fails
             }
           }
         }
       } catch (error) {
-        console.error('Error calculating commission for completed booking:', error);
         // Don't fail the booking completion if commission calculation fails
       }
     }
@@ -454,6 +460,19 @@ export const updateBookingStatus = async (req: AuthRequest, res: Response): Prom
     
     await booking.save();
 
+    // Process refund if cancelling
+    let refundResult: { success: boolean; refundId?: string; error?: string } | undefined = undefined;
+    if (status === 'cancelled' && booking.paymentStatus === 'paid') {
+      const cancelledBy = isMentor ? 'mentor' : 'mentee';
+      const refundType = req.body.refundType || (isMentor ? 'payment_method' : 'tokens');
+      refundResult = await RefundService.processRefund({
+        bookingId: (booking._id as any).toString(),
+        refundType: refundType as 'payment_method' | 'tokens',
+        reason: req.body.reason || 'Booking cancelled',
+        cancelledBy: cancelledBy
+      });
+    }
+
     // Send notifications based on status change
     try {
       if (status === 'confirmed') {
@@ -463,25 +482,26 @@ export const updateBookingStatus = async (req: AuthRequest, res: Response): Prom
           mentorId: booking.mentorId.toString(),
           serviceId: booking.serviceId.toString(),
           bookingDate: booking.scheduledAt,
-          meetingLink: `https://meet.mentr.com/${(booking._id as any).toString()}`
+          meetingLink: `${process.env.FRONTEND_URL}/video-call/${(booking._id as any).toString()}`
         });
       } else if (status === 'cancelled') {
         const cancelledBy = isMentor ? 'mentor' : 'mentee';
+
         await bookingNotificationService.sendBookingCancellationNotification({
           bookingId: (booking._id as any).toString(),
           menteeId: booking.studentId.toString(),
           mentorId: booking.mentorId.toString(),
           serviceId: booking.serviceId.toString(),
           bookingDate: booking.scheduledAt,
-          meetingLink: `https://meet.mentr.com/${(booking._id as any).toString()}`,
-          reason: req.body.reason || undefined
+          meetingLink: `${process.env.FRONTEND_URL}/video-call/${(booking._id as any).toString()}`,
+          reason: req.body.reason || undefined,
+          refund: refundResult
         }, cancelledBy);
 
         // Cancel scheduled reminders
         await bookingNotificationService.cancelScheduledReminders((booking._id as any).toString());
       }
     } catch (notificationError) {
-      console.error('Error sending booking status notifications:', notificationError);
       // Don't fail the status update if notifications fail
     }
 
@@ -495,10 +515,10 @@ export const updateBookingStatus = async (req: AuthRequest, res: Response): Prom
     res.json({
       success: true,
       data: booking,
+      refund: status === 'cancelled' ? refundResult : undefined,
       message: 'Booking status updated successfully'
     });
   } catch (error) {
-    console.error('Update booking status error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error'
@@ -562,7 +582,6 @@ export const updatePaymentStatus = async (req: AuthRequest, res: Response): Prom
       message: 'Payment status updated successfully'
     });
   } catch (error) {
-    console.error('Update payment status error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error'
@@ -608,7 +627,6 @@ export const getMentorAvailability = async (req: Request, res: Response): Promis
       data: bookingsWithLocalTime
     });
   } catch (error) {
-    console.error('Get mentor availability error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error'
@@ -727,7 +745,6 @@ export const getAvailableTimeSlots = async (req: Request, res: Response): Promis
     });
 
   } catch (error) {
-    console.error('Error getting available time slots:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error'

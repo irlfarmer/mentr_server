@@ -63,7 +63,6 @@ class NotificationService {
     // Check if it's quiet hours (skip non-urgent notifications)
     const isQuietHours = await NotificationPreferencesService.isQuietHours(userId);
     if (isQuietHours && priority !== 'urgent') {
-      console.log(`Skipping notification for user ${userId} due to quiet hours`);
       return notifications;
     }
     
@@ -252,7 +251,6 @@ class NotificationService {
       try {
         await this.sendNotification(notification);
       } catch (error) {
-        console.error(`Error processing notification ${notification._id}:`, error);
         await this.handleNotificationError(notification, error);
       }
     }
@@ -345,7 +343,6 @@ class NotificationService {
   // Send push notification (placeholder for future implementation)
   private async sendPushNotification(notification: INotification, user: any): Promise<void> {
     // TODO: Implement push notification service (Firebase, OneSignal, etc.)
-    console.log(`Push notification for ${user.email}: ${notification.title}`);
     await this.markNotificationAsSent(notification);
   }
 

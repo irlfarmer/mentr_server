@@ -1,10 +1,14 @@
 import express from 'express';
 import { WebhookController } from '../controllers/webhookController';
+import { DailyWebhookController } from '../controllers/dailyWebhookController';
 
 const router = express.Router();
 
 // Stripe webhook endpoint (must be raw body for signature verification)
 router.post('/stripe', express.raw({ type: 'application/json' }), WebhookController.handleWebhook);
+
+// Daily.co webhook endpoint (JSON body for signature verification)
+router.post('/daily', express.json(), DailyWebhookController.handleWebhook);
 
 // Health check for webhooks
 router.get('/health', (req, res) => {

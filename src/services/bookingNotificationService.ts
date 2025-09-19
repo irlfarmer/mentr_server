@@ -11,6 +11,11 @@ export interface BookingNotificationData {
   bookingDate: Date;
   meetingLink?: string;
   reason?: string; // For cancellations
+  refund?: {
+    success: boolean;
+    refundId?: string;
+    error?: string;
+  };
 }
 
 class BookingNotificationService {
@@ -67,7 +72,6 @@ class BookingNotificationService {
         sendImmediately: true
       });
     } catch (error) {
-      console.error('Error sending new booking notification:', error);
       throw error;
     }
   }
@@ -102,7 +106,6 @@ class BookingNotificationService {
         priority: 'medium'
       });
     } catch (error) {
-      console.error('Error sending booking confirmation notification:', error);
       throw error;
     }
   }
@@ -157,7 +160,6 @@ class BookingNotificationService {
         'medium'
       );
     } catch (error) {
-      console.error('Error sending 24h reminder notification:', error);
       throw error;
     }
   }
@@ -212,7 +214,6 @@ class BookingNotificationService {
         'high'
       );
     } catch (error) {
-      console.error('Error sending 30min reminder notification:', error);
       throw error;
     }
   }
@@ -232,6 +233,16 @@ class BookingNotificationService {
 
       const cancelledByName = cancelledBy === 'mentor' ? `${mentor.firstName} ${mentor.lastName}` : `${mentee.firstName} ${mentee.lastName}`;
       const reasonText = data.reason ? ` Reason: ${data.reason}` : '';
+      
+      // Add refund information to message
+      let refundText = '';
+      if (data.refund) {
+        if (data.refund.success) {
+          refundText = ` You have been automatically refunded.`;
+        } else {
+          refundText = ` Refund processing failed: ${data.refund.error}`;
+        }
+      }
 
       if (cancelledBy === 'mentor') {
         // Notify mentee that mentor cancelled
@@ -239,7 +250,7 @@ class BookingNotificationService {
           data.menteeId,
           'booking',
           'Session Cancelled by Mentor',
-          `Unfortunately, ${cancelledByName} has cancelled your "${service.title}" session scheduled for ${data.bookingDate.toLocaleString()}.${reasonText}`,
+          `Unfortunately, ${cancelledByName} has cancelled your "${service.title}" session scheduled for ${data.bookingDate.toLocaleString()}.${reasonText}${refundText}`,
           {
             bookingId: data.bookingId,
             mentorName: `${mentor.firstName} ${mentor.lastName}`,
@@ -256,7 +267,7 @@ class BookingNotificationService {
           data.mentorId,
           'booking',
           'Session Cancelled by Student',
-          `${cancelledByName} has cancelled their "${service.title}" session scheduled for ${data.bookingDate.toLocaleString()}.${reasonText}`,
+          `${cancelledByName} has cancelled their "${service.title}" session scheduled for ${data.bookingDate.toLocaleString()}.${reasonText}${refundText}`,
           {
             bookingId: data.bookingId,
             menteeName: `${mentee.firstName} ${mentee.lastName}`,
@@ -269,7 +280,6 @@ class BookingNotificationService {
         );
       }
     } catch (error) {
-      console.error('Error sending booking cancellation notification:', error);
       throw error;
     }
   }
@@ -280,31 +290,15 @@ class BookingNotificationService {
       const now = new Date();
       const bookingTime = new Date(data.bookingDate);
       
-      // Debug logging
-      console.log('Scheduling reminders for booking:', {
-        bookingId: data.bookingId,
-        bookingTime: bookingTime.toISOString(),
-        now: now.toISOString(),
-        timeUntilBooking: Math.round((bookingTime.getTime() - now.getTime()) / (1000 * 60 * 60)) // hours
-      });
-      
       // Calculate reminder times
       const reminder24h = new Date(bookingTime.getTime() - 24 * 60 * 60 * 1000);
       const reminder30min = new Date(bookingTime.getTime() - 30 * 60 * 1000);
-
-      console.log('Reminder times:', {
-        reminder24h: reminder24h.toISOString(),
-        reminder30min: reminder30min.toISOString(),
-        reminder24hInFuture: reminder24h > now,
-        reminder30minInFuture: reminder30min > now
-      });
 
       // Only schedule reminders if they're in the future
       const hoursUntilBooking = (bookingTime.getTime() - now.getTime()) / (1000 * 60 * 60);
       
       // Schedule 24h reminder if it's more than 24 hours away
       if (hoursUntilBooking > 24) {
-        console.log('Scheduling 24h reminder for mentor');
         await notificationService.createNotification({
           userId: data.mentorId,
           type: 'in_app',
@@ -323,7 +317,6 @@ class BookingNotificationService {
           scheduledFor: reminder24h
         });
 
-        console.log('Scheduling 24h reminder for mentee');
         await notificationService.createNotification({
           userId: data.menteeId,
           type: 'in_app',
@@ -342,12 +335,10 @@ class BookingNotificationService {
           scheduledFor: reminder24h
         });
       } else {
-        console.log(`Skipping 24h reminder - ${hoursUntilBooking.toFixed(1)} hours until booking (need >24h)`);
       }
 
       // Schedule 30-minute reminder if it's more than 30 minutes away
       if (hoursUntilBooking > 0.5) {
-        console.log('Scheduling 30min reminder for mentor');
         await notificationService.createNotification({
           userId: data.mentorId,
           type: 'in_app',
@@ -366,7 +357,6 @@ class BookingNotificationService {
           scheduledFor: reminder30min
         });
 
-        console.log('Scheduling 30min reminder for mentee');
         await notificationService.createNotification({
           userId: data.menteeId,
           type: 'in_app',
@@ -385,10 +375,8 @@ class BookingNotificationService {
           scheduledFor: reminder30min
         });
       } else {
-        console.log(`Skipping 30min reminder - ${hoursUntilBooking.toFixed(1)} hours until booking (need >0.5h)`);
       }
     } catch (error) {
-      console.error('Error scheduling reminder notifications:', error);
       throw error;
     }
   }
@@ -398,9 +386,7 @@ class BookingNotificationService {
     try {
       // This would typically involve updating the notification status
       // For now, we'll just log it - in a real implementation, you'd update the database
-      console.log(`Cancelling scheduled reminders for booking ${bookingId}`);
     } catch (error) {
-      console.error('Error cancelling scheduled reminders:', error);
       throw error;
     }
   }

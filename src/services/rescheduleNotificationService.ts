@@ -31,7 +31,6 @@ class RescheduleNotificationService {
       // Check if recipient has reschedule notifications enabled
       const preferences = await notificationService.getUserPreferences(data.requestedTo);
       if (!preferences?.email?.reschedule || !preferences?.inApp?.reschedule) {
-        console.log(`Reschedule notifications disabled for user ${data.requestedTo}`);
         return;
       }
 
@@ -67,7 +66,6 @@ class RescheduleNotificationService {
         'high'
       );
     } catch (error) {
-      console.error('Error sending new reschedule request notification:', error);
       throw error;
     }
   }
@@ -86,7 +84,6 @@ class RescheduleNotificationService {
       // Check if requester has reschedule notifications enabled
       const preferences = await notificationService.getUserPreferences(data.requestedBy);
       if (!preferences?.email?.reschedule || !preferences?.inApp?.reschedule) {
-        console.log(`Reschedule notifications disabled for user ${data.requestedBy}`);
         return;
       }
 
@@ -117,7 +114,6 @@ class RescheduleNotificationService {
         'high'
       );
     } catch (error) {
-      console.error('Error sending reschedule approved notification:', error);
       throw error;
     }
   }
@@ -136,7 +132,6 @@ class RescheduleNotificationService {
       // Check if requester has reschedule notifications enabled
       const preferences = await notificationService.getUserPreferences(data.requestedBy);
       if (!preferences?.email?.reschedule || !preferences?.inApp?.reschedule) {
-        console.log(`Reschedule notifications disabled for user ${data.requestedBy}`);
         return;
       }
 
@@ -168,7 +163,6 @@ class RescheduleNotificationService {
         'high'
       );
     } catch (error) {
-      console.error('Error sending reschedule rejected notification:', error);
       throw error;
     }
   }
@@ -187,7 +181,6 @@ class RescheduleNotificationService {
       // Check if recipient has reschedule notifications enabled
       const preferences = await notificationService.getUserPreferences(data.requestedTo);
       if (!preferences?.email?.reschedule || !preferences?.inApp?.reschedule) {
-        console.log(`Reschedule notifications disabled for user ${data.requestedTo}`);
         return;
       }
 
@@ -216,7 +209,6 @@ class RescheduleNotificationService {
         'medium'
       );
     } catch (error) {
-      console.error('Error sending reschedule reminder notification:', error);
       throw error;
     }
   }
@@ -288,7 +280,6 @@ class RescheduleNotificationService {
         );
       }
     } catch (error) {
-      console.error('Error sending reschedule auto-approval notification:', error);
       throw error;
     }
   }
@@ -312,7 +303,6 @@ class RescheduleNotificationService {
       // Check if user has reschedule notifications enabled
       const preferences = await notificationService.getUserPreferences(userId);
       if (!preferences?.email?.reschedule || !preferences?.inApp?.reschedule) {
-        console.log(`Reschedule notifications disabled for user ${userId}`);
         return;
       }
 
@@ -337,7 +327,6 @@ class RescheduleNotificationService {
         'low'
       );
     } catch (error) {
-      console.error('Error sending reschedule summary notification:', error);
       throw error;
     }
   }
@@ -356,7 +345,6 @@ class RescheduleNotificationService {
       // Check if recipient has reschedule notifications enabled
       const preferences = await notificationService.getUserPreferences(data.requestedTo);
       if (!preferences?.email?.reschedule || !preferences?.inApp?.reschedule) {
-        console.log(`Reschedule notifications disabled for user ${data.requestedTo}`);
         return;
       }
 
@@ -385,7 +373,6 @@ class RescheduleNotificationService {
         'high'
       );
     } catch (error) {
-      console.error('Error sending reschedule deadline warning notification:', error);
       throw error;
     }
   }

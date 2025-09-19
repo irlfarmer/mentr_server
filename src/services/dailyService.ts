@@ -58,6 +58,8 @@ class DailyService {
       const nbf = sessionStartTimestamp - (5 * 60); // 5 minutes before session start
       const exp = sessionStartTimestamp + sessionDurationSeconds; // Session end time
       
+      const webhookUrl = process.env.DAILY_WEBHOOK_URL || `${process.env.SERVER_URL}/api/webhooks/daily`;
+      
       const response = await axios.post(
         `${this.baseUrl}/rooms`,
         {
@@ -77,6 +79,8 @@ class DailyService {
             nbf: nbf, // Can't join before this time (5 min early)
             exp: exp, // Room expires at session end time
             eject_at_room_exp: true, // Automatically eject participants when room expires
+            // Webhook URL for room events (only meeting_join_hook is supported)
+            meeting_join_hook: webhookUrl,
           },
         },
         { headers: this.getHeaders() }
@@ -228,6 +232,53 @@ class DailyService {
     } catch (error: any) {
       console.error('Error getting recording:', error.response?.data || error.message);
       throw new Error(`Failed to get recording: ${error.response?.data?.error || error.message}`);
+    }
+  }
+
+  // Subscribe to webhook events
+  async subscribeToWebhooks(webhookUrl: string, events: string[] = ['meeting.started', 'meeting.ended', 'participant.joined', 'participant.left', 'recording.started', 'recording.ready-to-download', 'transcript.started', 'transcript.ready-to-download']): Promise<any> {
+    try {
+      const response = await axios.post(
+        `${this.baseUrl}/webhooks`,
+        {
+          url: webhookUrl,
+          events: events
+        },
+        { headers: this.getHeaders() }
+      );
+      console.log('Successfully subscribed to Daily.co webhooks:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('Error subscribing to Daily.co webhooks:', error.response?.data || error.message);
+      throw new Error(`Failed to subscribe to webhooks: ${error.response?.data?.error || error.message}`);
+    }
+  }
+
+  // Get current webhook subscriptions
+  async getWebhooks(): Promise<any> {
+    try {
+      const response = await axios.get(
+        `${this.baseUrl}/webhooks`,
+        { headers: this.getHeaders() }
+      );
+      return response.data;
+    } catch (error: any) {
+      console.error('Error getting Daily.co webhooks:', error.response?.data || error.message);
+      throw new Error(`Failed to get webhooks: ${error.response?.data?.error || error.message}`);
+    }
+  }
+
+  // Delete webhook subscription
+  async deleteWebhook(webhookId: string): Promise<any> {
+    try {
+      const response = await axios.delete(
+        `${this.baseUrl}/webhooks/${webhookId}`,
+        { headers: this.getHeaders() }
+      );
+      return response.data;
+    } catch (error: any) {
+      console.error('Error deleting Daily.co webhook:', error.response?.data || error.message);
+      throw new Error(`Failed to delete webhook: ${error.response?.data?.error || error.message}`);
     }
   }
 }

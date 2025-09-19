@@ -69,6 +69,20 @@ app.use(cors({
   origin: process.env.CLIENT_URL || 'http://localhost:3000',
   credentials: true
 }));
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: 'Mentr API is running',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Webhook routes (must be before JSON parsing middleware)
+app.use('/api/webhooks', webhookRoutes);
+
+// JSON parsing middleware (after webhooks)
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
@@ -84,15 +98,6 @@ app.use(session({
 }));
 
 // LinkedIn OAuth now handled by custom service - no Passport needed
-
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: 'Mentr API is running',
-    timestamp: new Date().toISOString()
-  });
-});
 
 // API Routes
 app.use('/api/auth', authRoutes);
@@ -116,7 +121,6 @@ app.use('/api/password-reset', passwordResetRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/notification-preferences', notificationPreferencesRoutes);
 app.use('/api/email-preferences', emailPreferencesRoutes);
-app.use('/api/webhooks', webhookRoutes);
 app.use('/api', vcsRoutes);
 
 // 404 handler
