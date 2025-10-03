@@ -167,7 +167,7 @@ class NotificationService {
     ]);
 
     return {
-      notifications: notifications as INotification[],
+      notifications: notifications as unknown as INotification[],
       total,
       pages: Math.ceil(total / limit)
     };
