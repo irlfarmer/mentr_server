@@ -56,7 +56,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       success: true,
       data: {
         user: {
-          id: user._id,
+          _id: user._id,
           email: user.email,
           firstName: user.firstName,
           lastName: user.lastName,

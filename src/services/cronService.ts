@@ -1,6 +1,7 @@
 import cron from 'node-cron';
 import { PayoutService } from './payoutService';
 import { notificationService } from './notificationService';
+import { AutoCancelService } from './autoCancelService';
 
 export class CronService {
   private static isRunning = false;
@@ -57,6 +58,18 @@ export class CronService {
         console.log('Notification processing completed');
       } catch (error) {
         console.error('Error in notification cron job:', error);
+      }
+    }, {
+      timezone: 'UTC'
+    });
+
+    // Auto-cancel pending bookings every 30 minutes
+    cron.schedule('*/30 * * * *', async () => {
+      try {
+        console.log('Running auto-cancel check for pending bookings...');
+        await AutoCancelService.cancelPendingBookings();
+      } catch (error) {
+        console.error('Error in auto-cancel cron job:', error);
       }
     }, {
       timezone: 'UTC'

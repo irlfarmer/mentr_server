@@ -11,6 +11,7 @@ export interface IBooking extends Document {
   duration: number; // in minutes
   status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'reviewable' | 'reviewed';
   paymentStatus: 'pending' | 'paid' | 'refunded';
+  paymentMethod: 'stripe' | 'tokens';
   amount: number;
   // Commission and payout tracking
   platformCommission?: number;
@@ -89,6 +90,11 @@ const BookingSchema = new Schema<IBooking>({
     type: String,
     enum: ['pending', 'paid', 'refunded'],
     default: 'pending'
+  },
+  paymentMethod: {
+    type: String,
+    enum: ['stripe', 'tokens'],
+    default: 'stripe'
   },
   amount: {
     type: Number,

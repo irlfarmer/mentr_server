@@ -7,6 +7,7 @@ import dotenv from 'dotenv';
 import session from 'express-session';
 import { connectDB } from '../config/database';
 import { setSocketInstance } from './services/socketService';
+import { presenceService } from './services/presenceService';
 import authRoutes from './routes/auth';
 import profileRoutes from './routes/profile';
 import serviceRoutes from './routes/services';
@@ -30,6 +31,7 @@ import notificationRoutes from './routes/notifications';
 import notificationPreferencesRoutes from './routes/notificationPreferences';
 import emailPreferencesRoutes from './routes/emailPreferences';
 import webhookRoutes from './routes/webhooks';
+import referralRoutes from './routes/referrals';
 import { CronService } from './services/cronService';
 
 // Load environment variables
@@ -60,6 +62,7 @@ const io = new Server(server, {
 
 // Set Socket.io instance for use in other modules
 setSocketInstance(io);
+presenceService.setSocketInstance(io);
 
 const PORT = process.env.PORT || 5000;
 
@@ -127,6 +130,7 @@ app.use('/api/password-reset', passwordResetRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/notification-preferences', notificationPreferencesRoutes);
 app.use('/api/email-preferences', emailPreferencesRoutes);
+app.use('/api/referrals', referralRoutes);
 app.use('/api', vcsRoutes);
 
 // 404 handler
@@ -148,9 +152,15 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 
 // Socket.io connection handling
 io.on('connection', (socket: any) => {
+  let currentUserId: string | null = null;
+
   // User joins their personal room for notifications
-  socket.on('join-user-room', (userId: string) => {
+  socket.on('join-user-room', async (userId: string) => {
     socket.join(`user_${userId}`);
+    currentUserId = userId;
+    
+    // Set user as online
+    await presenceService.setUserOnline(userId, socket.id);
   });
 
   // User joins a conversation room
@@ -187,8 +197,17 @@ io.on('connection', (socket: any) => {
     });
   });
 
-  socket.on('disconnect', () => {
-    // Handle cleanup if needed
+  // Handle user activity (update last seen)
+  socket.on('user-activity', async (userId: string) => {
+    await presenceService.updateLastSeen(userId);
+  });
+
+  socket.on('disconnect', async () => {
+    // Set user as offline
+    if (currentUserId) {
+      await presenceService.setUserOffline(currentUserId);
+    }
+    presenceService.removeSocketMapping(socket.id);
   });
 });
 

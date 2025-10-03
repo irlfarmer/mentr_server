@@ -10,6 +10,7 @@ import { CommissionService } from '../services/commissionService';
 import { bookingNotificationService } from '../services/bookingNotificationService';
 import { payoutNotificationService } from '../services/payoutNotificationService';
 import { RefundService } from '../services/refundService';
+import { ReferralService } from '../services/referralService';
 
 // Create a new booking
 export const createBooking = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -24,7 +25,7 @@ export const createBooking = async (req: AuthRequest, res: Response): Promise<vo
       return;
     }
 
-    const { serviceId, scheduledAt, duration, notes, studentTimezone } = req.body;
+    const { serviceId, scheduledAt, duration, notes, studentTimezone, paymentMethod = 'stripe' } = req.body;
 
     // Validate required fields
     if (!serviceId || !scheduledAt || !duration) {
@@ -153,6 +154,7 @@ export const createBooking = async (req: AuthRequest, res: Response): Promise<vo
       studentTimezone: studentTz,
       duration,
       amount,
+      paymentMethod,
       notes,
       cancellationPolicy: {
         minimumCancellationHours: mentor.minimumCancellationHours || 24,
@@ -484,6 +486,29 @@ export const updateBookingStatus = async (req: AuthRequest, res: Response): Prom
           bookingDate: booking.scheduledAt,
           meetingLink: `${process.env.FRONTEND_URL}/video-call/${(booking._id as any).toString()}`
         });
+
+        // Record referral earning for confirmed booking - 1% of mentor's payout (after platform commission)
+        if (booking.paymentMethod !== 'tokens' && booking.paymentStatus === 'paid') {
+          try {
+            const mentor = await User.findById(booking.mentorId);
+            if (mentor) {
+              // Calculate mentor's payout (after platform commission)
+              const currentTier = CommissionService.calculateTier(mentor);
+              const mentorPayout = CommissionService.calculateMentorPayout(booking.amount, currentTier);
+              
+              // Record referral earning: 1% of mentor's payout
+              await ReferralService.recordEarning(
+                booking.studentId.toString(), 
+                'booking', 
+                (booking._id as any).toString(), 
+                mentorPayout
+              );
+            }
+          } catch (error) {
+            console.error('Error recording referral earning for confirmed booking:', error);
+            // Don't fail the booking confirmation if referral earning fails
+          }
+        }
       } else if (status === 'cancelled') {
         const cancelledBy = isMentor ? 'mentor' : 'mentee';
 

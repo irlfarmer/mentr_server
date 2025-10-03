@@ -20,6 +20,7 @@ export interface IUser {
   availability: IAvailability[];
   documents: IDocument[];
   timezone: string;
+  mentraBalance?: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -189,4 +190,58 @@ export interface JWTPayload {
   userType: string;
   iat: number;
   exp: number;
+}
+
+// Referral Types
+export interface IReferral {
+  _id: string;
+  referrerId: string;
+  refereeId: string;
+  referralCode: string;
+  status: 'pending' | 'active' | 'inactive';
+  totalEarnings: number;
+  lastEarningDate?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface IReferralCode {
+  _id: string;
+  userId: string;
+  code: string;
+  isActive: boolean;
+  totalUses: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface IReferralEarning {
+  _id: string;
+  referrerId: string;
+  refereeId: string;
+  referralId: string;
+  sourceType: 'booking' | 'chat' | 'token_purchase';
+  sourceId: string;
+  amount: number;
+  commissionRate: number;
+  commissionAmount: number;
+  status: 'pending' | 'paid' | 'cancelled';
+  paidAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ReferralStats {
+  referralCode: string;
+  referralLink: string;
+  totalReferrals: number;
+  totalEarnings: number;
+  pendingEarnings: number;
+  referrals: Array<{
+    refereeName: string;
+    refereeEmail: string;
+    joinedAt: Date;
+    totalSpent: number;
+    earnings: number;
+  }>;
 }

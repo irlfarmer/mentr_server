@@ -7,6 +7,7 @@ import {
   markAsRead,
   getUnreadCount
 } from '../controllers/messageController';
+import { presenceService } from '../services/presenceService';
 import { authenticate } from '../middleware/auth';
 
 const router = express.Router();
@@ -33,5 +34,26 @@ router.put('/conversations/:conversationId/read', markAsRead);
 
 // Get unread message count
 router.get('/unread-count', getUnreadCount);
+
+// Get online status for users
+router.get('/online-status/:userIds', async (req, res) => {
+  try {
+    const { userIds } = req.params;
+    const userIdArray = userIds.split(',');
+    
+    const statuses = await presenceService.getUsersOnlineStatus(userIdArray);
+    
+    res.json({
+      success: true,
+      data: statuses
+    });
+  } catch (error) {
+    console.error('Error getting online status:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get online status'
+    });
+  }
+});
 
 export default router;

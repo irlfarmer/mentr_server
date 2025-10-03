@@ -96,6 +96,8 @@ export interface IUserDocument extends Document {
   isBanned: boolean;
   emailVerified: boolean;
   timezone: string;
+  isOnline: boolean;
+  lastSeen: Date;
   createdAt: Date;
   updatedAt: Date;
   comparePassword(candidatePassword: string): Promise<boolean>;
@@ -326,6 +328,13 @@ const UserSchema = new Schema<IUserDocument>({
   timezone: {
     type: String,
     default: 'UTC'
+  },
+  isOnline: {
+    type: Boolean,
+    default: false
+  },
+  lastSeen: {
+    type: Date
   }
 }, {
   timestamps: true

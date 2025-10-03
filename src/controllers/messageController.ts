@@ -17,7 +17,8 @@ const hasUpcomingBooking = async (studentId: string, mentorId: string): Promise<
     studentId,
     mentorId,
     scheduledAt: { $gte: now },
-    status: { $in: ['confirmed', 'pending'] }
+    status: 'confirmed', // Only confirmed bookings allow warm messages
+    paymentStatus: 'paid'
   });
   return !!upcomingBooking;
 };

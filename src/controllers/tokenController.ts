@@ -3,6 +3,7 @@ import { User } from '../models/User';
 import { TokenTransaction } from '../models/TokenTransaction';
 import { AuthRequest } from '../types';
 import { StripeService, CreatePaymentIntentParams } from '../services/stripeService';
+import { ReferralService } from '../services/referralService';
 
 // Get user's token balance and recent transactions
 export const getBalance = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -162,6 +163,9 @@ export const confirmTokenTopUp = async (req: AuthRequest, res: Response): Promis
       reference: `stripe_${paymentIntentId}`
     });
     await transaction.save();
+
+    // Record referral earning for token purchase
+    await ReferralService.recordEarning(userId, 'token_purchase', (transaction._id as any).toString(), amount);
 
     res.json({
       success: true,
