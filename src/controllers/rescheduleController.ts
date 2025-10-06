@@ -365,19 +365,22 @@ export const cancelBooking = async (req: AuthRequest, res: Response): Promise<vo
       return;
     }
 
-    // Check cancellation time limit
-    const now = new Date();
-    const sessionTime = new Date(booking.scheduledAtUTC);
-    const hoursUntilSession = (sessionTime.getTime() - now.getTime()) / (1000 * 60 * 60);
-    const minimumHours = booking.cancellationPolicy?.minimumCancellationHours || 24;
+    // Check cancellation time limit (only for paid bookings)
+    if (booking.paymentStatus === 'paid') {
+      const now = new Date();
+      const sessionTime = new Date(booking.scheduledAtUTC);
+      const hoursUntilSession = (sessionTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+      const minimumHours = booking.cancellationPolicy?.minimumCancellationHours || 24;
 
-    if (hoursUntilSession < minimumHours) {
-      res.status(400).json({
-        success: false,
-        error: `Booking cannot be cancelled less than ${minimumHours} hours before the session. You can cancel until ${new Date(sessionTime.getTime() - minimumHours * 60 * 60 * 1000).toLocaleString()}.`
-      });
-      return;
+      if (hoursUntilSession < minimumHours) {
+        res.status(400).json({
+          success: false,
+          error: `Booking cannot be cancelled less than ${minimumHours} hours before the session. You can cancel until ${new Date(sessionTime.getTime() - minimumHours * 60 * 60 * 1000).toLocaleString()}.`
+        });
+        return;
+      }
     }
+    // For unpaid bookings, allow cancellation at any time
 
     // Determine who cancelled and refund type
     const isMentor = booking.mentorId.toString() === userId;

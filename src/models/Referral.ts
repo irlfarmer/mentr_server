@@ -21,8 +21,7 @@ const ReferralSchema = new Schema<IReferral>({
   refereeId: {
     type: Schema.Types.ObjectId,
     ref: 'User',
-    required: true,
-    index: true
+    required: true
   },
   referralCode: {
     type: String,

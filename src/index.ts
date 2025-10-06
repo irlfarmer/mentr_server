@@ -5,6 +5,7 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import dotenv from 'dotenv';
 import session from 'express-session';
+import MongoStore from 'connect-mongo';
 import { connectDB } from '../config/database';
 import { setSocketInstance } from './services/socketService';
 import { presenceService } from './services/presenceService';
@@ -100,6 +101,10 @@ app.use(session({
   secret: process.env.JWT_SECRET || 'your-secret-key',
   resave: false,
   saveUninitialized: false,
+  store: MongoStore.create({
+    mongoUrl: process.env.MONGODB_URI || 'mongodb://localhost:27017/mentr',
+    touchAfter: 24 * 3600 // lazy session update
+  }),
   cookie: {
     secure: process.env.NODE_ENV === 'production',
     maxAge: 24 * 60 * 60 * 1000 // 24 hours

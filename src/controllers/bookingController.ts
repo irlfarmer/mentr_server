@@ -381,20 +381,24 @@ export const updateBookingStatus = async (req: AuthRequest, res: Response): Prom
       return;
     }
 
-    // Check cancellation time limit if cancelling
+    // Check cancellation time limit if cancelling (only for paid bookings)
     if (status === 'cancelled') {
-      const now = new Date();
-      const sessionTime = new Date(booking.scheduledAtUTC);
-      const hoursUntilSession = (sessionTime.getTime() - now.getTime()) / (1000 * 60 * 60);
-      const minimumHours = booking.cancellationPolicy?.minimumCancellationHours || 24;
+      // Allow cancellation for unpaid bookings regardless of time limit
+      if (booking.paymentStatus === 'paid') {
+        const now = new Date();
+        const sessionTime = new Date(booking.scheduledAtUTC);
+        const hoursUntilSession = (sessionTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+        const minimumHours = booking.cancellationPolicy?.minimumCancellationHours || 24;
 
-      if (hoursUntilSession < minimumHours) {
-        res.status(400).json({
-          success: false,
-          error: `Booking cannot be cancelled less than ${minimumHours} hours before the session. You can cancel until ${new Date(sessionTime.getTime() - minimumHours * 60 * 60 * 1000).toLocaleString()}.`
-        });
-        return;
+        if (hoursUntilSession < minimumHours) {
+          res.status(400).json({
+            success: false,
+            error: `Booking cannot be cancelled less than ${minimumHours} hours before the session. You can cancel until ${new Date(sessionTime.getTime() - minimumHours * 60 * 60 * 1000).toLocaleString()}.`
+          });
+          return;
+        }
       }
+      // For unpaid bookings, allow cancellation at any time
     }
 
     // Update booking status
@@ -662,12 +666,22 @@ export const getMentorAvailability = async (req: Request, res: Response): Promis
 // Get available time slots for a specific date and mentor
 export const getAvailableTimeSlots = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { mentorId, date, timezone = 'UTC' } = req.query;
+    const { mentorId, date, serviceId, timezone = 'UTC' } = req.query;
 
-    if (!mentorId || !date) {
+    if (!mentorId || !date || !serviceId) {
       res.status(400).json({
         success: false,
-        error: 'Missing required parameters: mentorId and date'
+        error: 'Missing required parameters: mentorId, date, and serviceId'
+      });
+      return;
+    }
+
+    // Get service to get duration
+    const service = await Service.findById(serviceId);
+    if (!service) {
+      res.status(404).json({
+        success: false,
+        error: 'Service not found'
       });
       return;
     }
@@ -732,7 +746,12 @@ export const getAvailableTimeSlots = async (req: Request, res: Response): Promis
       
       // Check if this time slot conflicts with existing bookings
       const slotStartMinutes = minutes;
-      const slotEndMinutes = minutes + 60; // Assuming 1-hour slots
+      const slotEndMinutes = minutes + service.duration; // Use actual service duration
+      
+      // Skip this slot if it would exceed mentor's availability
+      if (slotEndMinutes > endMinutes) {
+        continue;
+      }
       
       const hasConflict = existingBookings.some((booking: any) => {
         const bookingStartMinutes = booking.scheduledAt.getHours() * 60 + booking.scheduledAt.getMinutes();
@@ -747,10 +766,14 @@ export const getAvailableTimeSlots = async (req: Request, res: Response): Promis
       });
       
       if (!hasConflict) {
+        const endHours = Math.floor(slotEndMinutes / 60);
+        const endMins = slotEndMinutes % 60;
+        const endTimeString = `${endHours.toString().padStart(2, '0')}:${endMins.toString().padStart(2, '0')}`;
+        
         availableSlots.push({
           time: timeString,
-          endTime: `${Math.floor((minutes + 60) / 60).toString().padStart(2, '0')}:${((minutes + 60) % 60).toString().padStart(2, '0')}`,
-          duration: 60
+          endTime: endTimeString,
+          duration: service.duration
         });
       }
     }

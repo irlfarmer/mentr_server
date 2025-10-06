@@ -22,9 +22,9 @@ export class WebhookService {
         return;
       }
 
-      // Skip processing for temporary IDs (amount-based payments)
-      if (bookingId.startsWith('temp_')) {
-        console.log(`Skipping webhook processing for temporary booking ID: ${bookingId}`);
+      // Skip processing for temporary IDs (amount-based payments) and token top-ups
+      if (bookingId.startsWith('temp_') || bookingId.startsWith('token_topup_')) {
+        console.log(`Skipping webhook processing for temporary/token top-up ID: ${bookingId}`);
         return;
       }
 
