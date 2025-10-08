@@ -86,7 +86,7 @@ export const markAsRead = async (req: Request, res: Response): Promise<void> => 
 
     const notification = await Notification.findOneAndUpdate(
       { _id: notificationId, userId },
-      { read: true },
+      { isRead: true, readAt: new Date() },
       { new: true }
     );
 
@@ -116,8 +116,8 @@ export const markAllAsRead = async (req: Request, res: Response): Promise<void> 
     }
 
     await Notification.updateMany(
-      { userId, read: false },
-      { read: true }
+      { userId, isRead: false },
+      { isRead: true, readAt: new Date() }
     );
 
     res.json({ success: true });
