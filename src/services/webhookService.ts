@@ -24,22 +24,35 @@ export class WebhookService {
 
       // Skip processing for temporary IDs (amount-based payments) and token top-ups
       if (bookingId.startsWith('temp_') || bookingId.startsWith('token_topup_')) {
-        console.log(`Skipping webhook processing for temporary/token top-up ID: ${bookingId}`);
         return;
       }
 
       // Update booking status
       const booking = await Booking.findById(bookingId);
       if (!booking) {
-        console.log(`Booking not found for ID: ${bookingId}`);
+        // Booking not found
         return;
       }
 
-      // Only update if not already paid
+      // Update payment status and booking status
+      let needsUpdate = false;
+      
       if (booking.paymentStatus !== 'paid') {
         booking.paymentStatus = 'paid';
+        needsUpdate = true;
+      }
+      
+      if (booking.status !== 'confirmed') {
         booking.status = 'confirmed'; // Update booking status to confirmed
+        needsUpdate = true;
+      }
+      
+      if (!booking.stripePaymentIntentId) {
         booking.stripePaymentIntentId = paymentIntent.id;
+        needsUpdate = true;
+      }
+      
+      if (needsUpdate) {
         await booking.save();
 
 
@@ -100,14 +113,13 @@ export class WebhookService {
 
       // Skip processing for temporary IDs (amount-based payments)
       if (bookingId.startsWith('temp_')) {
-        console.log(`Skipping webhook processing for temporary booking ID: ${bookingId}`);
         return;
       }
 
       // Update booking status
       const booking = await Booking.findById(bookingId);
       if (!booking) {
-        console.log(`Booking not found for ID: ${bookingId}`);
+        // Booking not found
         return;
       }
 
