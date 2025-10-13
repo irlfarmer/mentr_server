@@ -42,7 +42,6 @@ export class DailyWebhookService {
   // Process incoming webhook events
   static async processWebhookEvent(event: DailyWebhookEvent): Promise<void> {
     try {
-      console.log(`Processing Daily.co webhook for room: ${event.room_name}`);
 
       // Determine event type based on Daily.co webhook format
       if (event.meeting_ended || event.first_non_owner_join === false) {
@@ -52,10 +51,8 @@ export class DailyWebhookService {
         // This is a participant joined event
         await this.handleParticipantJoined(event);
       } else {
-        console.log(`Unhandled Daily.co webhook event for room: ${event.room_name}`);
       }
     } catch (error) {
-      console.error('Error processing Daily.co webhook event:', error);
       throw error;
     }
   }
@@ -65,14 +62,14 @@ export class DailyWebhookService {
     const { room_name, user_name, user_id, is_owner } = event;
 
     if (!user_id) {
-      console.error('No user_id in join event');
+      // No user_id in join event
       return;
     }
 
     // Find video call by room name
     const videoCall = await VideoCall.findOne({ roomName: room_name });
     if (!videoCall) {
-      console.error(`Video call not found for room: ${room_name}`);
+      // Video call not found for room
       return;
     }
 
@@ -92,10 +89,9 @@ export class DailyWebhookService {
       videoCall.status = 'in_progress';
       videoCall.startedAt = new Date();
       await videoCall.save();
-      console.log(`Video call started: ${videoCall._id}`);
+      
     }
 
-    console.log(`Participant joined: ${user_name || 'Guest'} (${user_id}) to room: ${room_name}`);
   }
 
   // Handle participant left event
@@ -103,14 +99,14 @@ export class DailyWebhookService {
     const { room_name, user_name, user_id } = event;
 
     if (!user_id) {
-      console.error('No user_id in leave event');
+      // No user_id in leave event
       return;
     }
 
     // Find video call by room name
     const videoCall = await VideoCall.findOne({ roomName: room_name });
     if (!videoCall) {
-      console.error(`Video call not found for room: ${room_name}`);
+      // Video call not found for room
       return;
     }
 
@@ -124,7 +120,6 @@ export class DailyWebhookService {
     // Update participant tracking
     await this.updateParticipantTracking(videoCall, participant, 'left');
 
-    console.log(`Participant left: ${user_name || 'Guest'} (${user_id}) from room: ${room_name}`);
   }
 
   // Handle room ended event
@@ -134,7 +129,7 @@ export class DailyWebhookService {
     // Find video call by room name
     const videoCall = await VideoCall.findOne({ roomName: room_name });
     if (!videoCall) {
-      console.error(`Video call not found for room: ${room_name}`);
+      // Video call not found for room
       return;
     }
 
@@ -158,14 +153,12 @@ export class DailyWebhookService {
       // Update booking status to completed
       await this.updateBookingStatus(videoCall, 'completed');
 
-      console.log(`Video call completed: ${videoCall._id} with duration: ${videoCall.duration} minutes`);
     } else {
       // Mark as no-show or incomplete
       videoCall.status = 'no_show';
       videoCall.endedAt = new Date();
       await videoCall.save();
 
-      console.log(`Video call marked as no-show: ${videoCall._id} - ${validationResult.reason}`);
     }
   }
 
@@ -174,13 +167,13 @@ export class DailyWebhookService {
     const { room_name, recording } = event;
 
     if (!recording) {
-      console.error('No recording data in recording started event');
+      // No recording data in recording started event
       return;
     }
 
     const videoCall = await VideoCall.findOne({ roomName: room_name });
     if (!videoCall) {
-      console.error(`Video call not found for room: ${room_name}`);
+      // Video call not found for room
       return;
     }
 
@@ -188,7 +181,6 @@ export class DailyWebhookService {
     videoCall.status = 'recording';
     await videoCall.save();
 
-    console.log(`Recording started for video call: ${videoCall._id}`);
   }
 
   // Handle recording uploaded event
@@ -196,20 +188,19 @@ export class DailyWebhookService {
     const { room_name, recording } = event;
 
     if (!recording || !recording.download_link) {
-      console.error('No recording download link in uploaded event');
+      // No recording download link in uploaded event
       return;
     }
 
     const videoCall = await VideoCall.findOne({ roomName: room_name });
     if (!videoCall) {
-      console.error(`Video call not found for room: ${room_name}`);
+      // Video call not found for room
       return;
     }
 
     videoCall.recordingUrl = recording.download_link;
     await videoCall.save();
 
-    console.log(`Recording uploaded for video call: ${videoCall._id}`);
   }
 
   // Handle recording stopped event
@@ -218,7 +209,7 @@ export class DailyWebhookService {
 
     const videoCall = await VideoCall.findOne({ roomName: room_name });
     if (!videoCall) {
-      console.error(`Video call not found for room: ${room_name}`);
+      // Video call not found for room
       return;
     }
 
@@ -226,7 +217,6 @@ export class DailyWebhookService {
     videoCall.status = 'in_progress';
     await videoCall.save();
 
-    console.log(`Recording stopped for video call: ${videoCall._id}`);
   }
 
   // Handle transcription updated event
@@ -234,20 +224,19 @@ export class DailyWebhookService {
     const { room_name, transcription } = event;
 
     if (!transcription || !transcription.download_link) {
-      console.error('No transcription download link in updated event');
+      // No transcription download link in updated event
       return;
     }
 
     const videoCall = await VideoCall.findOne({ roomName: room_name });
     if (!videoCall) {
-      console.error(`Video call not found for room: ${room_name}`);
+      // Video call not found for room
       return;
     }
 
     videoCall.transcriptionUrl = transcription.download_link;
     await videoCall.save();
 
-    console.log(`Transcription updated for video call: ${videoCall._id}`);
   }
 
   // Update participant tracking in video call
@@ -331,9 +320,9 @@ export class DailyWebhookService {
   private static async updateBookingStatus(videoCall: any, status: string): Promise<void> {
     try {
       await Booking.findByIdAndUpdate(videoCall.bookingId, { status });
-      console.log(`Booking ${videoCall.bookingId} status updated to: ${status}`);
+      
     } catch (error) {
-      console.error('Error updating booking status:', error);
+      // Error updating booking status
     }
   }
 }

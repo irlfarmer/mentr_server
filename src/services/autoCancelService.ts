@@ -16,7 +16,6 @@ export class AutoCancelService {
         createdAt: { $lt: fourHoursAgo }
       }).populate('studentId mentorId serviceId');
 
-      console.log(`Found ${pendingBookings.length} pending bookings to auto-cancel`);
 
       for (const booking of pendingBookings) {
         try {
@@ -41,15 +40,13 @@ export class AutoCancelService {
             'mentee'
           );
 
-          console.log(`Auto-cancelled booking ${booking._id}`);
         } catch (error) {
-          console.error(`Error auto-cancelling booking ${booking._id}:`, error);
+          // Error auto-cancelling booking
         }
       }
 
-      console.log(`Auto-cancellation completed. Processed ${pendingBookings.length} bookings.`);
     } catch (error) {
-      console.error('Error in auto-cancel service:', error);
+      // Error in auto-cancel service
     }
   }
 
@@ -84,7 +81,6 @@ export class AutoCancelService {
         oldestPending: oldestPendingBooking?.createdAt || null
       };
     } catch (error) {
-      console.error('Error getting pending booking stats:', error);
       return {
         totalPending: 0,
         pendingOver4Hours: 0,

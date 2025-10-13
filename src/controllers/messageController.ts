@@ -263,7 +263,6 @@ export const sendMessage = async (req: AuthRequest, res: Response) => {
             receiver.coldMessageRate
           );
         } catch (notificationError) {
-          console.error('Error sending payment required notification:', notificationError);
           // Don't fail the response if notification fails
         }
 
@@ -295,10 +294,9 @@ export const sendMessage = async (req: AuthRequest, res: Response) => {
         );
         
         if (earningsResult.success) {
-          console.log(`Mentor ${receiver.firstName} ${receiver.lastName} earned $${(receiver.coldMessageRate * 0.75).toFixed(2)} from cold message (Tier: ${earningsResult.newTier || 'unchanged'})`);
+          // Mentor earned from cold message
         }
       } catch (error) {
-        console.error('Error adding mentor earnings for cold message:', error);
         // Don't fail the message send if earnings tracking fails
       }
     }
@@ -367,7 +365,6 @@ export const sendMessage = async (req: AuthRequest, res: Response) => {
         });
       }
     } catch (notificationError) {
-      console.error('Error sending chat notification:', notificationError);
       // Don't fail the message send if notification fails
     }
 
@@ -380,7 +377,6 @@ export const sendMessage = async (req: AuthRequest, res: Response) => {
       updatedBalance: updatedUser?.mentraBalance || 0
     });
   } catch (error) {
-    console.error('Send message error:', error);
     return res.status(500).json({
       success: false,
       error: 'Failed to send message'
@@ -501,7 +497,6 @@ export const processColdMessagePayment = async (req: AuthRequest, res: Response)
         message._id.toString()
       );
     } catch (notificationError) {
-      console.error('Error sending chat notification:', notificationError);
       // Don't fail the message send if notification fails
     }
 
@@ -514,7 +509,6 @@ export const processColdMessagePayment = async (req: AuthRequest, res: Response)
       updatedBalance: updatedUser?.mentraBalance || 0
     });
   } catch (error) {
-    console.error('Process cold message payment error:', error);
     return res.status(500).json({
       success: false,
       error: 'Failed to process payment'
@@ -555,7 +549,6 @@ export const markAsRead = async (req: AuthRequest, res: Response) => {
         );
       }
     } catch (notificationError) {
-      console.error('Error sending read notifications:', notificationError);
       // Don't fail the mark as read if notification fails
     }
 

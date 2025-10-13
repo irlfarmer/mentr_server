@@ -32,7 +32,7 @@ class DisputeNotificationService {
       // Check if mentor has dispute notifications enabled
       const preferences = await notificationService.getUserPreferences(data.mentorId);
       if (!preferences?.email?.dispute || !preferences?.inApp?.dispute) {
-        console.log(`Dispute notifications disabled for mentor ${data.mentorId}`);
+        // Dispute notifications disabled for mentor
         return;
       }
 
@@ -62,7 +62,7 @@ class DisputeNotificationService {
         'urgent'
       );
     } catch (error) {
-      console.error('Error sending new dispute notification:', error);
+      // Error sending new dispute notification
       throw error;
     }
   }
@@ -81,7 +81,7 @@ class DisputeNotificationService {
       // Check if mentee has dispute notifications enabled
       const preferences = await notificationService.getUserPreferences(data.menteeId);
       if (!preferences?.email?.dispute || !preferences?.inApp?.dispute) {
-        console.log(`Dispute notifications disabled for mentee ${data.menteeId}`);
+        // Dispute notifications disabled for mentee
         return;
       }
 
@@ -111,7 +111,7 @@ class DisputeNotificationService {
         'high'
       );
     } catch (error) {
-      console.error('Error sending mentor response notification:', error);
+      // Error sending mentor response notification
       throw error;
     }
   }
@@ -187,7 +187,7 @@ class DisputeNotificationService {
         );
       }
     } catch (error) {
-      console.error('Error sending dispute resolution notification:', error);
+      // Error sending dispute resolution notification
       throw error;
     }
   }
@@ -255,7 +255,7 @@ class DisputeNotificationService {
         );
       }
     } catch (error) {
-      console.error('Error sending dispute dismissed notification:', error);
+      // Error sending dispute dismissed notification
       throw error;
     }
   }
@@ -319,7 +319,7 @@ class DisputeNotificationService {
         );
       }
     } catch (error) {
-      console.error('Error sending dispute escalation notification:', error);
+      // Error sending dispute escalation notification
       throw error;
     }
   }
@@ -361,7 +361,7 @@ class DisputeNotificationService {
         );
       }
     } catch (error) {
-      console.error('Error sending dispute reminder notification:', error);
+      // Error sending dispute reminder notification
       throw error;
     }
   }
@@ -406,7 +406,7 @@ class DisputeNotificationService {
         'urgent'
       );
     } catch (error) {
-      console.error('Error sending admin dispute notification:', error);
+      // Error sending admin dispute notification
       throw error;
     }
   }

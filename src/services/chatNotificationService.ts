@@ -29,7 +29,6 @@ class ChatNotificationService {
       // Check if user has chat notifications enabled
       const preferences = await notificationService.getUserPreferences(data.receiverId);
       if (!preferences?.email?.chat || !preferences?.inApp?.chat) {
-        console.log(`Chat notifications disabled for user ${data.receiverId}`);
         return;
       }
 
@@ -87,7 +86,6 @@ class ChatNotificationService {
         priority
       );
     } catch (error) {
-      console.error('Error sending new message notification:', error);
       throw error;
     }
   }
@@ -104,7 +102,6 @@ class ChatNotificationService {
       // Check if sender has chat notifications enabled
       const preferences = await notificationService.getUserPreferences(senderId);
       if (!preferences?.email?.chat || !preferences?.inApp?.chat) {
-        console.log(`Chat notifications disabled for user ${senderId}`);
         return;
       }
 
@@ -123,7 +120,6 @@ class ChatNotificationService {
         'low'
       );
     } catch (error) {
-      console.error('Error sending message read notification:', error);
       throw error;
     }
   }
@@ -140,7 +136,6 @@ class ChatNotificationService {
       // Check if receiver has chat notifications enabled
       const preferences = await notificationService.getUserPreferences(receiverId);
       if (!preferences?.email?.chat || !preferences?.inApp?.chat) {
-        console.log(`Chat notifications disabled for user ${receiverId}`);
         return;
       }
 
@@ -163,7 +158,6 @@ class ChatNotificationService {
         });
       }
     } catch (error) {
-      console.error('Error sending typing notification:', error);
       throw error;
     }
   }
@@ -181,7 +175,6 @@ class ChatNotificationService {
       // Check if user has chat notifications enabled
       const preferences = await notificationService.getUserPreferences(data.receiverId);
       if (!preferences?.email?.chat || !preferences?.inApp?.chat) {
-        console.log(`Chat notifications disabled for user ${data.receiverId}`);
         return;
       }
 
@@ -212,7 +205,6 @@ class ChatNotificationService {
         'high'
       );
     } catch (error) {
-      console.error('Error sending conversation started notification:', error);
       throw error;
     }
   }
@@ -229,7 +221,6 @@ class ChatNotificationService {
       // Check if sender has chat notifications enabled
       const preferences = await notificationService.getUserPreferences(senderId);
       if (!preferences?.email?.chat || !preferences?.inApp?.chat) {
-        console.log(`Chat notifications disabled for user ${senderId}`);
         return;
       }
 
@@ -248,7 +239,6 @@ class ChatNotificationService {
         'low'
       );
     } catch (error) {
-      console.error('Error sending message delivered notification:', error);
       throw error;
     }
   }
@@ -265,7 +255,6 @@ class ChatNotificationService {
       // Check if sender has chat notifications enabled
       const preferences = await notificationService.getUserPreferences(senderId);
       if (!preferences?.email?.chat || !preferences?.inApp?.chat) {
-        console.log(`Chat notifications disabled for user ${senderId}`);
         return;
       }
 
@@ -285,7 +274,6 @@ class ChatNotificationService {
         'high'
       );
     } catch (error) {
-      console.error('Error sending message failed notification:', error);
       throw error;
     }
   }
@@ -302,7 +290,6 @@ class ChatNotificationService {
       // Check if sender has chat notifications enabled
       const preferences = await notificationService.getUserPreferences(senderId);
       if (!preferences?.email?.chat || !preferences?.inApp?.chat) {
-        console.log(`Chat notifications disabled for user ${senderId}`);
         return;
       }
 
@@ -320,7 +307,6 @@ class ChatNotificationService {
         'high'
       );
     } catch (error) {
-      console.error('Error sending payment required notification:', error);
       throw error;
     }
   }
@@ -337,7 +323,6 @@ class ChatNotificationService {
       // Check if sender has chat notifications enabled
       const preferences = await notificationService.getUserPreferences(senderId);
       if (!preferences?.email?.chat || !preferences?.inApp?.chat) {
-        console.log(`Chat notifications disabled for user ${senderId}`);
         return;
       }
 
@@ -356,7 +341,6 @@ class ChatNotificationService {
         'medium'
       );
     } catch (error) {
-      console.error('Error sending payment successful notification:', error);
       throw error;
     }
   }
@@ -379,7 +363,6 @@ class ChatNotificationService {
       // Check if user has chat notifications enabled
       const preferences = await notificationService.getUserPreferences(userId);
       if (!preferences?.email?.chat || !preferences?.inApp?.chat) {
-        console.log(`Chat notifications disabled for user ${userId}`);
         return;
       }
 
@@ -403,7 +386,6 @@ class ChatNotificationService {
         'low'
       );
     } catch (error) {
-      console.error('Error sending conversation summary notification:', error);
       throw error;
     }
   }

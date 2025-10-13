@@ -74,7 +74,7 @@ export class MentorEarningsService {
         commissionAmount
       };
     } catch (error) {
-      console.error('Error adding mentor earnings:', error);
+      // Error adding mentor earnings
       return { success: false };
     }
   }
@@ -148,7 +148,7 @@ export class MentorEarningsService {
         nextTierProgress
       };
     } catch (error) {
-      console.error('Error getting mentor earnings summary:', error);
+      // Error getting mentor earnings summary
       return null;
     }
   }
@@ -160,7 +160,7 @@ export class MentorEarningsService {
     try {
       const mentor = await User.findById(mentorId).select('mentorEarnings');
       if (!mentor || !mentor.mentorEarnings) {
-        console.log(`No mentor or earnings found for ${mentorId}`);
+        // No mentor or earnings found
         return [];
       }
 
@@ -177,7 +177,7 @@ export class MentorEarningsService {
       // Limit to requested number of months
       return filteredEarnings.slice(0, months);
     } catch (error) {
-      console.error('Error getting monthly earnings:', error);
+      // Error getting monthly earnings
       return [];
     }
   }
@@ -211,7 +211,7 @@ export class MentorEarningsService {
       await mentor.save();
       return true;
     } catch (error) {
-      console.error('Error updating mentor tier:', error);
+      // Error updating mentor tier
       return false;
     }
   }
@@ -238,7 +238,7 @@ export class MentorEarningsService {
         tierInfo: CommissionService.getTierInfo(mentor.mentorEarnings?.commissionTier || 'tier1')
       }));
     } catch (error) {
-      console.error('Error getting all mentor earnings:', error);
+      // Error getting all mentor earnings
       return [];
     }
   }
@@ -280,7 +280,7 @@ export class MentorEarningsService {
         totalGrossEarnings: totalCommission + totalMentorPayouts
       };
     } catch (error) {
-      console.error('Error calculating total platform commission:', error);
+      // Error calculating total platform commission
       return {
         totalCommission: 0,
         totalMentorPayouts: 0,
@@ -332,7 +332,7 @@ export class MentorEarningsService {
         totalColdMessages
       };
     } catch (error) {
-      console.error('Error getting platform stats:', error);
+      // Error getting platform stats
       return {
         totalCommission: 0,
         totalMentorPayouts: 0,

@@ -36,7 +36,7 @@ class DailyService {
   constructor() {
     this.apiKey = process.env.DAILY_API_KEY || '';
     if (!this.apiKey) {
-      console.warn('DAILY_API_KEY not found in environment variables');
+      // DAILY_API_KEY not found in environment variables
     }
   }
 
@@ -87,7 +87,6 @@ class DailyService {
       );
       return response.data;
     } catch (error: any) {
-      console.error('Error creating Daily.co room:', error.response?.data || error.message);
       throw new Error(`Failed to create room: ${error.response?.data?.error || error.message}`);
     }
   }
@@ -101,7 +100,6 @@ class DailyService {
       );
       return response.data;
     } catch (error: any) {
-      console.error('Error getting Daily.co room:', error.response?.data || error.message);
       throw new Error(`Failed to get room: ${error.response?.data?.error || error.message}`);
     }
   }
@@ -114,7 +112,6 @@ class DailyService {
         { headers: this.getHeaders() }
       );
     } catch (error: any) {
-      console.error('Error deleting Daily.co room:', error.response?.data || error.message);
       throw new Error(`Failed to delete room: ${error.response?.data?.error || error.message}`);
     }
   }
@@ -153,7 +150,6 @@ class DailyService {
         exp: exp,
       };
     } catch (error: any) {
-      console.error('Error creating meeting token:', error.response?.data || error.message);
       throw new Error(`Failed to create meeting token: ${error.response?.data?.error || error.message}`);
     }
   }
@@ -167,7 +163,6 @@ class DailyService {
       );
       return response.data.data || [];
     } catch (error: any) {
-      console.error('Error listing Daily.co rooms:', error.response?.data || error.message);
       throw new Error(`Failed to list rooms: ${error.response?.data?.error || error.message}`);
     }
   }
@@ -201,7 +196,6 @@ class DailyService {
       );
       return response.data;
     } catch (error: any) {
-      console.error('Error starting recording with watermark:', error.response?.data || error.message);
       throw new Error(`Failed to start recording: ${error.response?.data?.error || error.message}`);
     }
   }
@@ -216,7 +210,6 @@ class DailyService {
       );
       return response.data;
     } catch (error: any) {
-      console.error('Error stopping recording:', error.response?.data || error.message);
       throw new Error(`Failed to stop recording: ${error.response?.data?.error || error.message}`);
     }
   }
@@ -230,7 +223,6 @@ class DailyService {
       );
       return response.data;
     } catch (error: any) {
-      console.error('Error getting recording:', error.response?.data || error.message);
       throw new Error(`Failed to get recording: ${error.response?.data?.error || error.message}`);
     }
   }
@@ -246,10 +238,8 @@ class DailyService {
         },
         { headers: this.getHeaders() }
       );
-      console.log('Successfully subscribed to Daily.co webhooks:', response.data);
       return response.data;
     } catch (error: any) {
-      console.error('Error subscribing to Daily.co webhooks:', error.response?.data || error.message);
       throw new Error(`Failed to subscribe to webhooks: ${error.response?.data?.error || error.message}`);
     }
   }
@@ -263,7 +253,6 @@ class DailyService {
       );
       return response.data;
     } catch (error: any) {
-      console.error('Error getting Daily.co webhooks:', error.response?.data || error.message);
       throw new Error(`Failed to get webhooks: ${error.response?.data?.error || error.message}`);
     }
   }
@@ -277,7 +266,6 @@ class DailyService {
       );
       return response.data;
     } catch (error: any) {
-      console.error('Error deleting Daily.co webhook:', error.response?.data || error.message);
       throw new Error(`Failed to delete webhook: ${error.response?.data?.error || error.message}`);
     }
   }

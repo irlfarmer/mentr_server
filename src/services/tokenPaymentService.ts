@@ -64,11 +64,7 @@ export class TokenPaymentService {
           booking.status = 'confirmed'; // Auto-confirm when paid with tokens
           await booking.save({ session });
           
-          console.log('Token payment - Booking updated:', {
-            paymentStatus: booking.paymentStatus,
-            paymentMethod: booking.paymentMethod,
-            status: booking.status
-          });
+
           
           return { success: true, transactionId: (transaction._id as any).toString() };
         });

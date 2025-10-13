@@ -13,17 +13,17 @@ export class CronService {
     // Check for pending payouts every hour
     cron.schedule('0 * * * *', async () => {
       if (this.isRunning) {
-        console.log('Payout check already running, skipping...');
+        
         return;
       }
 
       try {
         this.isRunning = true;
-        console.log('Running hourly payout check...');
+        
         await PayoutService.checkPendingPayouts();
-        console.log('Payout check completed');
+        // Payout check completed
       } catch (error) {
-        console.error('Error in payout cron job:', error);
+        // Error in payout cron job
       } finally {
         this.isRunning = false;
       }
@@ -39,10 +39,10 @@ export class CronService {
 
       try {
         this.isRunning = true;
-        console.log('Running business hours payout check...');
+        // Running business hours payout check...
         await PayoutService.checkPendingPayouts();
       } catch (error) {
-        console.error('Error in business hours payout cron job:', error);
+        // Error in business hours payout cron job
       } finally {
         this.isRunning = false;
       }
@@ -53,11 +53,11 @@ export class CronService {
     // Process pending notifications every 5 minutes
     cron.schedule('*/5 * * * *', async () => {
       try {
-        console.log('Processing pending notifications...');
+        // Processing pending notifications...
         await notificationService.processPendingNotifications();
-        console.log('Notification processing completed');
+        // Notification processing completed
       } catch (error) {
-        console.error('Error in notification cron job:', error);
+        // Error in notification cron job
       }
     }, {
       timezone: 'UTC'
@@ -66,16 +66,16 @@ export class CronService {
     // Auto-cancel pending bookings every 30 minutes
     cron.schedule('*/30 * * * *', async () => {
       try {
-        console.log('Running auto-cancel check for pending bookings...');
+        // Running auto-cancel check for pending bookings...
         await AutoCancelService.cancelPendingBookings();
       } catch (error) {
-        console.error('Error in auto-cancel cron job:', error);
+        // Error in auto-cancel cron job
       }
     }, {
       timezone: 'UTC'
     });
 
-    console.log('Cron jobs started successfully');
+    // Cron jobs started successfully
   }
 
   // Stop all cron jobs
@@ -83,17 +83,17 @@ export class CronService {
     cron.getTasks().forEach(task => {
       task.destroy();
     });
-    console.log('All cron jobs stopped');
+    // All cron jobs stopped
   }
 
   // Manual payout check (for testing)
   static async runManualPayoutCheck(): Promise<void> {
     try {
-      console.log('Running manual payout check...');
+        // Running manual payout check...
       await PayoutService.checkPendingPayouts();
-      console.log('Manual payout check completed');
+      // Manual payout check completed
     } catch (error) {
-      console.error('Error in manual payout check:', error);
+      // Error in manual payout check
       throw error;
     }
   }

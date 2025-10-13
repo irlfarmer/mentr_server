@@ -254,11 +254,7 @@ const handlePaymentSucceeded = async (paymentIntent: any) => {
         // Update payment status
         booking.paymentStatus = 'paid';
         booking.stripePaymentIntentId = paymentIntent.id;
-        
-        // Auto-confirm booking after successful payment
-        if (booking.status === 'pending') {
-          booking.status = 'confirmed';
-        }
+        booking.status = 'confirmed';
         
         await booking.save();
       }
