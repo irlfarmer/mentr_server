@@ -28,7 +28,7 @@ export class WebhookService {
       }
 
       // Update booking status
-      const booking = await Booking.findById(bookingId);
+      const booking = await Booking.findById(bookingId).populate('mentorId serviceId', 'firstName lastName title');
       if (!booking) {
         // Booking not found
         return;
@@ -67,7 +67,11 @@ export class WebhookService {
               bookingId: (booking._id as any).toString(),
               paymentIntentId: paymentIntent.id,
               amount: paymentIntent.amount / 100,
-              status: 'paid'
+              status: 'paid',
+              bookingDate: booking.scheduledAt,
+              mentorName: `${(booking.mentorId as any).firstName} ${(booking.mentorId as any).lastName}`,
+              serviceTitle: (booking.serviceId as any).title,
+              meetingLink: `${process.env.FRONTEND_URL}/video-call/${(booking._id as any).toString()}`
             }
           );
         } catch (notificationError) {
