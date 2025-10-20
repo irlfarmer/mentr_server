@@ -105,6 +105,23 @@ class BookingNotificationService {
         },
         priority: 'medium'
       });
+
+      // Send confirmation to mentor
+      await notificationService.createNotification({
+        userId: data.mentorId,
+        type: 'in_app',
+        category: 'booking',
+        title: 'Booking Confirmed',
+        message: `Your session with ${mentee.firstName} ${mentee.lastName} for "${service.title}" has been confirmed for ${data.bookingDate.toLocaleString()}`,
+        data: {
+          bookingId: data.bookingId,
+          menteeName: `${mentee.firstName} ${mentee.lastName}`,
+          serviceTitle: service.title,
+          bookingDate: data.bookingDate,
+          meetingLink: data.meetingLink
+        },
+        priority: 'medium'
+      });
     } catch (error) {
       throw error;
     }
@@ -301,7 +318,7 @@ class BookingNotificationService {
       if (hoursUntilBooking > 24) {
         await notificationService.createNotification({
           userId: data.mentorId,
-          type: 'in_app',
+          type: 'email',
           category: 'booking',
           title: 'Session Reminder - 24 Hours',
           message: `Reminder: Your session is scheduled for tomorrow`,
@@ -319,7 +336,7 @@ class BookingNotificationService {
 
         await notificationService.createNotification({
           userId: data.menteeId,
-          type: 'in_app',
+          type: 'email',
           category: 'booking',
           title: 'Session Reminder - 24 Hours',
           message: `Reminder: Your session is scheduled for tomorrow`,
@@ -341,7 +358,7 @@ class BookingNotificationService {
       if (hoursUntilBooking > 0.5) {
         await notificationService.createNotification({
           userId: data.mentorId,
-          type: 'in_app',
+          type: 'email',
           category: 'booking',
           title: 'Session Starting Soon - 30 Minutes',
           message: `Your session starts in 30 minutes`,
@@ -359,7 +376,7 @@ class BookingNotificationService {
 
         await notificationService.createNotification({
           userId: data.menteeId,
-          type: 'in_app',
+          type: 'email',
           category: 'booking',
           title: 'Session Starting Soon - 30 Minutes',
           message: `Your session starts in 30 minutes`,
