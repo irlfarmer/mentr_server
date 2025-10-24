@@ -33,7 +33,9 @@ import notificationPreferencesRoutes from './routes/notificationPreferences';
 import emailPreferencesRoutes from './routes/emailPreferences';
 import webhookRoutes from './routes/webhooks';
 import referralRoutes from './routes/referrals';
+import noteRoutes from './routes/notes';
 import { CronService } from './services/cronService';
+import { NoteCleanupService } from './services/noteCleanupService';
 
 // Load environment variables
 dotenv.config();
@@ -136,6 +138,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/notification-preferences', notificationPreferencesRoutes);
 app.use('/api/email-preferences', emailPreferencesRoutes);
 app.use('/api/referrals', referralRoutes);
+app.use('/api/notes', noteRoutes);
 app.use('/api', vcsRoutes);
 
 // 404 handler
@@ -224,6 +227,9 @@ server.listen(PORT, () => {
   
   // Start cron jobs for automatic payouts
   CronService.startCronJobs();
+  
+  // Initialize note cleanup jobs
+  NoteCleanupService.initializeCleanupJobs();
 });
 
 // Graceful shutdown
