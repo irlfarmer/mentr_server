@@ -59,7 +59,7 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
 };
 
 export const requireVerified = (req: AuthRequest, res: Response, next: NextFunction): void => {
-  if (!req.user?.isVerified) {
+  if (!req.user?.isEmailVerified) {
     res.status(403).json({
       success: false,
       error: 'Account verification required'

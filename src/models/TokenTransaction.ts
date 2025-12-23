@@ -2,7 +2,7 @@ import mongoose, { Document, Schema } from 'mongoose';
 
 export interface ITokenTransaction extends Document {
   userId: mongoose.Types.ObjectId;
-  type: 'credit' | 'debit';
+  type: 'credit' | 'debit' | 'refund';
   amount: number;
   description: string;
   reference?: string;
@@ -17,7 +17,7 @@ const TokenTransactionSchema = new Schema<ITokenTransaction>({
   },
   type: { 
     type: String, 
-    enum: ['credit', 'debit'], 
+    enum: ['credit', 'debit', 'refund'], 
     required: true 
   },
   amount: { 

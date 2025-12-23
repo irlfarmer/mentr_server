@@ -9,6 +9,7 @@ import {
 } from '../controllers/messageController';
 import { presenceService } from '../services/presenceService';
 import { authenticate } from '../middleware/auth';
+import { uploadShared, uploadMessage } from '../config/cloudinary';
 
 const router = express.Router();
 
@@ -24,7 +25,7 @@ router.get('/conversations', getConversations);
 router.get('/conversations/:conversationId/messages', getMessages);
 
 // Send a new message
-router.post('/send', sendMessage);
+router.post('/send', uploadMessage.array('files', 5), sendMessage);
 
 // Process payment for cold message
 router.post('/send-cold', processColdMessagePayment);

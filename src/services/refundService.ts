@@ -2,6 +2,7 @@ import { StripeService } from './stripeService';
 import { User } from '../models/User';
 import { Booking } from '../models/Booking';
 import { TokenTransaction } from '../models/TokenTransaction';
+import Message from '../models/Message';
 
 export interface RefundOptions {
   bookingId: string;
@@ -146,6 +147,53 @@ export class RefundService {
     } else {
       // No refund if cancelled less than 2 hours before
       return 0;
+    }
+  }
+
+  // Process refunds for expired cold messages
+  static async processExpiredColdMessages(): Promise<void> {
+    const cutoffDate = new Date(Date.now() - 72 * 60 * 60 * 1000); // 72 hours ago
+
+    try {
+      const expiredMessages = await Message.find({
+        isColdMessage: true,
+        replied: false,
+        tokensDeducted: { $gt: 0 },
+        createdAt: { $lt: cutoffDate },
+        paymentStatus: { $ne: 'refunded' } // Ensure not already refunded
+      });
+
+      if (expiredMessages.length > 0) {
+        console.log(`Found ${expiredMessages.length} expired cold messages to refund.`);
+      }
+
+      for (const message of expiredMessages) {
+        try {
+          const sender = await User.findById(message.senderId);
+          if (sender) {
+            // Refund tokens
+            sender.mentraBalance = (sender.mentraBalance || 0) + (message.tokensDeducted || 0);
+            await sender.save();
+
+            // Create transaction
+            await TokenTransaction.create({
+              userId: sender._id,
+              type: 'refund',
+              amount: message.tokensDeducted,
+              description: `Refund for unanswered cold message`,
+              reference: `msg_refund_${message._id}`
+            });
+          }
+
+          // Update message status
+          message.paymentStatus = 'refunded';
+          await message.save();
+        } catch (error) {
+          console.error(`Failed to process refund for message ${message._id}:`, error);
+        }
+      }
+    } catch (error) {
+      console.error('Error finding expired cold messages:', error);
     }
   }
 }

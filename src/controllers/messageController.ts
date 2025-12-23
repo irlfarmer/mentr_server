@@ -183,6 +183,49 @@ export const sendMessage = async (req: AuthRequest, res: Response) => {
   try {
     const userId = (req.user as any)?._id;
     const { receiverId, content, type = 'text', fileUrl } = req.body;
+    
+    // Process uploaded files
+    const attachments: any[] = [];
+    if (req.files && Array.isArray(req.files)) {
+        (req.files as any[]).forEach((file: any) => {
+            // Debug: log file object to see what we're getting
+            console.log('Uploaded file object:', JSON.stringify({
+                path: file.path,
+                filename: file.filename,
+                mimetype: file.mimetype,
+                originalname: file.originalname
+            }));
+            
+            // Determine type based on mimetype
+            const isImage = file.mimetype.startsWith('image/') && !file.mimetype.includes('pdf');
+            const isVideo = file.mimetype.startsWith('video/');
+            
+            // For raw files (PDFs, docs), use our backend proxy instead of direct Cloudinary URL
+            let fileUrl = file.path;
+            if (!isImage && !isVideo) {
+                // Extract public_id from the URL path
+                const urlParts = file.path.split('/upload/');
+                if (urlParts.length > 1) {
+                    // Get everything after /upload/v{version}/
+                    const afterUpload = urlParts[1];
+                    const publicId = afterUpload.replace(/^v\d+\//, '');
+                    console.log('Using proxy URL for publicId:', publicId);
+                    
+                    // Use our backend proxy endpoint instead of direct Cloudinary URL
+                    const baseUrl = process.env.API_URL || 'http://localhost:5000';
+                    fileUrl = `${baseUrl}/api/files/proxy/${encodeURIComponent(publicId)}`;
+                    console.log('Generated proxy URL:', fileUrl);
+                }
+            }
+            
+            attachments.push({
+                type: isImage ? 'image' : 'file',
+                url: fileUrl,
+                name: file.originalname,
+                publicId: file.filename
+            });
+        });
+    }
 
     if (!userId) {
       return res.status(401).json({
@@ -191,10 +234,10 @@ export const sendMessage = async (req: AuthRequest, res: Response) => {
       });
     }
 
-    if (!receiverId || !content) {
+    if (!receiverId || (!content && attachments.length === 0)) {
       return res.status(400).json({
         success: false,
-        error: 'Receiver ID and content are required'
+        error: 'Receiver ID and content (or files) are required'
       });
     }
 
@@ -229,6 +272,7 @@ export const sendMessage = async (req: AuthRequest, res: Response) => {
     // For cold messages, check if payment is required
     let paymentStatus = 'free';
     let paymentAmount = 0;
+    let transactionId: string | undefined;
     
     if (messageType === 'cold' && receiver.coldMessageRate && receiver.coldMessageRate > 0) {
       // Check if user has sufficient token balance
@@ -248,13 +292,13 @@ export const sendMessage = async (req: AuthRequest, res: Response) => {
       }
       
       // Deduct tokens for cold message
-      const success = await deductTokens(
+      const result = await deductTokens(
         userId, 
         receiver.coldMessageRate, 
         `Cold message to ${receiver.firstName} ${receiver.lastName}`
       );
       
-      if (!success) {
+      if (!result.success) {
         // Send payment required notification
         try {
           await chatNotificationService.sendPaymentRequiredNotification(
@@ -280,6 +324,7 @@ export const sendMessage = async (req: AuthRequest, res: Response) => {
       
       paymentStatus = 'paid';
       paymentAmount = receiver.coldMessageRate;
+      transactionId = result.transactionId;
       
       // CRITICAL FIX: Add earnings for the mentor who received the cold message
       try {
@@ -305,15 +350,40 @@ export const sendMessage = async (req: AuthRequest, res: Response) => {
     const message = new Message({
       senderId: userId,
       receiverId,
-      content,
-      type,
+      content: content || (attachments.length > 0 ? 'Sent an attachment' : ''),
+      type: attachments.length > 0 ? (attachments[0].type === 'image' ? 'image' : 'file') : type,
       messageType,
       paymentStatus,
       paymentAmount,
-      fileUrl
+      fileUrl,
+      attachments, // Add attachments
+      // Cold message tracking
+      isColdMessage: messageType === 'cold',
+      tokensDeducted: paymentAmount,
+      tokenTransactionId: transactionId, // If payment was made
+      replied: false
     });
 
     await message.save();
+
+    // Check if this message is a reply to an existing unreplied cold message
+    // If user is replying, they are the senderId, and original sender is the receiverId
+    try {
+      const originalColdMessage = await Message.findOne({
+        conversationId: message.conversationId,
+        senderId: receiverId, // Original sender (now receiver)
+        receiverId: userId,   // Original receiver (now sender)
+        isColdMessage: true,
+        replied: false
+      }).sort({ createdAt: -1 });
+
+      if (originalColdMessage) {
+        originalColdMessage.replied = true;
+        await originalColdMessage.save();
+      }
+    } catch (replyError) {
+      console.error('Error updating reply status:', replyError);
+    }
 
     // Populate sender info for response
     await message.populate('senderId', 'firstName lastName profileImage');

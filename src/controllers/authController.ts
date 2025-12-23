@@ -61,7 +61,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
           firstName: user.firstName,
           lastName: user.lastName,
           userType: user.userType,
-          isVerified: user.isVerified
+          isEmailVerified: user.isEmailVerified
         },
         token
       },
@@ -270,7 +270,7 @@ export const verifyLinkedInProfile = async (req: Request, res: Response): Promis
 
     // Update user with LinkedIn data
     user.linkedinProfileUrl = linkedinProfileUrl;
-    user.isVerified = false; // Pending admin verification
+    // Note: LinkedIn verification doesn't automatically grant the paid badge (isVerified)
     user.verificationScore = 0;
     user.verificationDate = new Date();
     

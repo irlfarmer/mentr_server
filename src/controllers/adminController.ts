@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import { User } from '../models/User';
 import { Booking } from '../models/Booking';
 import { Service } from '../models/Service';
+import VerificationRequest from '../models/VerificationRequest';
+import { deleteResource } from '../config/cloudinary'; // Import delete helper
 import { startOfDay, endOfDay, startOfMonth, endOfMonth, subDays, subMonths } from 'date-fns';
 
 // Admin middleware to check if user is admin
@@ -155,7 +157,7 @@ export const getRecentUsers = async (req: Request, res: Response) => {
   try {
     const limit = parseInt(req.query.limit as string) || 10;
     const users = await User.find()
-      .select('firstName lastName email userType isVerified isActive isBanned createdAt profileImage')
+      .select('firstName lastName email userType isVerified isEmailVerified isActive isBanned createdAt profileImage')
       .sort({ createdAt: -1 })
       .limit(limit);
 
@@ -176,17 +178,17 @@ export const getRecentUsers = async (req: Request, res: Response) => {
 export const getPendingVerifications = async (req: Request, res: Response) => {
   try {
     const limit = parseInt(req.query.limit as string) || 10;
-    const users = await User.find({
-      isVerified: false,
-      userType: { $in: ['mentor', 'both'] }
+    
+    const requests = await VerificationRequest.find({
+      status: 'pending_review'
     })
-      .select('firstName lastName email userType isVerified isActive isBanned linkedinProfileUrl createdAt profileImage')
+      .populate('userId', 'firstName lastName email userType isVerified isActive isBanned linkedinProfileUrl createdAt profileImage')
       .sort({ createdAt: -1 })
       .limit(limit);
 
     res.json({
       success: true,
-      data: users
+      data: requests
     });
   } catch (error) {
     console.error('Error fetching pending verifications:', error);
@@ -337,6 +339,8 @@ export const getAllUsers = async (req: Request, res: Response) => {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
     const search = req.query.search as string;
+    const userType = req.query.type as string; // Support type filtering
+    const status = req.query.status as string; // Support status filtering
     const skip = (page - 1) * limit;
 
     const query: any = {};
@@ -347,20 +351,62 @@ export const getAllUsers = async (req: Request, res: Response) => {
         { email: { $regex: search, $options: 'i' } }
       ];
     }
+    
+    // Apply user type filter if provided
+    if (userType && userType !== 'all') {
+      if (userType === 'both') {
+        query.userType = 'both';
+      } else {
+        query.userType = userType;
+      }
+    }
+    
+    // Apply status filter if provided
+    if (status && status !== 'all') {
+      if (status === 'verified') {
+        query.isVerified = true;
+      } else if (status === 'unverified') {
+        query.isVerified = false;
+      } else if (status === 'suspended') {
+        query.isActive = false;
+      }
+    }
 
     const [users, total] = await Promise.all([
       User.find(query)
-        .select('firstName lastName email userType isVerified isActive isBanned createdAt profileImage')
+        .select('firstName lastName email userType isVerified isEmailVerified isActive isBanned createdAt profileImage')
         .sort({ createdAt: -1 })
         .skip(skip)
-        .limit(limit),
+        .limit(limit)
+        .lean(),
       User.countDocuments(query)
     ]);
+    
+    // Fetch pending verification requests for these users
+    const userIds = users.map((u: any) => u._id);
+    const pendingRequests = await VerificationRequest.find({
+      userId: { $in: userIds },
+      status: 'pending_review'
+    }).select('_id userId documents status');
+    
+    // Map requests to users
+    const enrichedUsers = users.map((user: any) => {
+      const request = pendingRequests.find((req: any) => req.userId.toString() === user._id.toString());
+      if (request) {
+        return {
+          ...user,
+          verificationRequestId: request._id,
+          documents: request.documents,
+          hasPendingVerification: true
+        };
+      }
+      return user;
+    });
 
     res.json({
       success: true,
       data: {
-        users,
+        users: enrichedUsers,
         total,
         page,
         totalPages: Math.ceil(total / limit)
@@ -450,6 +496,92 @@ export const verifyUser = async (req: Request, res: Response): Promise<void> => 
     res.status(500).json({
       success: false,
       error: 'Failed to verify user'
+    });
+  }
+};
+
+// Handle verification request (approve/reject)
+export const handleVerificationDecision = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { requestId } = req.params;
+    const { decision, reason, adminNotes } = req.body; // decision: 'approve' | 'reject'
+
+    if (!['approve', 'reject'].includes(decision)) {
+       res.status(400).json({ success: false, error: 'Invalid decision' });
+       return;
+    }
+
+    const request = await VerificationRequest.findById(requestId);
+    if (!request) {
+       res.status(404).json({ success: false, error: 'Request not found' });
+       return;
+    }
+
+    if (request.status !== 'pending_review') {
+       res.status(400).json({ success: false, error: 'Request is not pending review' });
+       return;
+    }
+
+    if (decision === 'approve') {
+      request.status = 'approved';
+      request.adminNotes = adminNotes;
+      
+      // Update User
+      await User.findByIdAndUpdate(request.userId, {
+        isVerified: true,
+        verificationDate: new Date()
+      });
+      
+      // Delete documents from Cloudinary after verification
+      if (request.documents && request.documents.length > 0) {
+        for (const doc of request.documents) {
+            // Extract public_id from URL if not stored separately
+            // Assuming documents have _id, name, url, type. 
+            // If public_id isn't stored, we might need to parse it from URL or use a different approach.
+            // For now, let's try to extract from URL if possible, or skip if unsafe.
+            // Better approach: If you are not storing public_id, you cannot reliably delete.
+            // However, many Cloudinary implementations store it.
+            // Let's assume standard Cloudinary URL structure if public_id is missing.
+            
+            try {
+                // Regex to extract public ID from Cloudinary URL
+                // Pattern: .../upload/v<version>/<folder>/<public_id>.<ext>
+                const regex = /\/upload\/(?:v\d+\/)?(.+)\.[^.]+$/;
+                const match = doc.url.match(regex);
+                if (match && match[1]) {
+                    const publicId = match[1];
+                    await deleteResource(publicId, 'image'); // Assume images for now
+                    console.log(`Deleted verification document: ${publicId}`);
+                }
+            } catch (err) {
+                console.error('Failed to delete verification document:', err);
+            }
+        }
+        // Clear documents buffer from DB object if desired, or keep record but file is gone.
+        // Usually keeping record is good for audit, even if link breaks.
+      }
+
+      // TODO: Send approval email notification
+    } else {
+      request.status = 'rejected';
+      request.rejectionReason = reason;
+      request.adminNotes = adminNotes;
+      
+      // TODO: Send rejection email notification
+    }
+
+    await request.save();
+
+    res.json({
+      success: true,
+      message: `Verification request ${decision}d successfully`
+    });
+
+  } catch (error) {
+    console.error('Error handling verification decision:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to process decision'
     });
   }
 };
@@ -931,7 +1063,7 @@ export const getUserProfile = async (req: Request, res: Response) => {
       return;
     }
 
-    const user = await User.findById(userId).select('-password -emailVerificationToken -passwordResetToken -passwordResetExpires');
+    const user = await User.findById(userId).select('-password -emailVerificationToken -passwordResetToken -passwordResetExpires').lean();
     
     if (!user) {
       res.status(404).json({
@@ -941,9 +1073,22 @@ export const getUserProfile = async (req: Request, res: Response) => {
       return;
     }
 
+    // Check for pending verification request
+    const pendingRequest = await VerificationRequest.findOne({
+      userId: user._id,
+      status: 'pending_review'
+    });
+
+    const enrichedUser = {
+      ...user,
+      verificationRequestId: pendingRequest?._id,
+      hasPendingVerification: !!pendingRequest,
+      verificationDocuments: pendingRequest?.documents || []
+    };
+
     res.json({
       success: true,
-      data: user
+      data: enrichedUser
     });
   } catch (error) {
     console.error('Get user profile error:', error);

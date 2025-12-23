@@ -12,6 +12,7 @@ export interface IUserDocument extends Document {
   profileImage?: string;
   bio?: string;
   isVerified: boolean;
+  isEmailVerified: boolean;
   verificationDate?: Date;
   verificationScore?: number;
   emailVerificationToken?: string;
@@ -197,6 +198,10 @@ const UserSchema = new Schema<IUserDocument>({
     maxlength: 500
   },
   isVerified: {
+    type: Boolean,
+    default: false
+  },
+  isEmailVerified: {
     type: Boolean,
     default: false
   },

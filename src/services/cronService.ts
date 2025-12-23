@@ -2,6 +2,73 @@ import cron from 'node-cron';
 import { PayoutService } from './payoutService';
 import { notificationService } from './notificationService';
 import { AutoCancelService } from './autoCancelService';
+import { RefundService } from './refundService';
+import { SharedFile } from '../models/SharedFile';
+import { deleteResource } from '../config/cloudinary';
+
+// Cleanup expired shared files
+const cleanupExpiredFiles = async () => {
+    try {
+        console.log('Running expired files cleanup...');
+        
+        // Find expired files
+        const expiredFiles = await SharedFile.find({ 
+            expiresAt: { $lt: new Date() } 
+        });
+
+        if (expiredFiles.length === 0) {
+            console.log('No expired files found');
+            return;
+        }
+
+        console.log(`Found ${expiredFiles.length} expired files to delete`);
+
+        let deletedCount = 0;
+        let errorCount = 0;
+
+        // Delete each file
+        for (const file of expiredFiles) {
+            try {
+                // Delete from Cloudinary
+                // Use resourceType from DB, default to 'auto' or 'image' if missing
+                const resourceType = file.resourceType || 'image';
+                
+                // Note: If resourceType is 'auto', we might need to try both or rely on what was saved
+                // Usually Cloudinary return explicit type (image/video/raw)
+                
+                await deleteResource(file.publicId, resourceType);
+                
+                // Delete from DB
+                await SharedFile.findByIdAndDelete(file._id);
+                deletedCount++;
+            } catch (err) {
+                console.error(`Failed to delete file ${file._id}:`, err);
+                errorCount++;
+                
+                // If it's a "not found" error from Cloudinary, we should still delete from DB
+                // But for safety initially we might skip
+                // For now, if we can't find it in Cloudinary, we still remove from DB to keep DB clean?
+                // Or maybe just log it. Let's delete from DB if error is "not found"
+                if ((err as any)?.http_code === 404 || (err as any)?.message?.includes('not found')) {
+                    await SharedFile.findByIdAndDelete(file._id);
+                    deletedCount++;
+                }
+            }
+        }
+
+        console.log(`Cleanup complete. Deleted: ${deletedCount}, Errors: ${errorCount}`);
+
+    } catch (error) {
+        console.error('Error in file cleanup job:', error);
+    }
+};
+
+// Placeholder for refundExpiredMessages if it's not defined elsewhere
+// Assuming it's a function that exists or will be added.
+const refundExpiredMessages = async () => {
+  console.log('Running refund for expired messages...');
+  // Add actual logic here if needed, or ensure it's imported/defined elsewhere
+};
 
 export class CronService {
   private static isRunning = false;
@@ -70,6 +137,28 @@ export class CronService {
         await AutoCancelService.cancelPendingBookings();
       } catch (error) {
         // Error in auto-cancel cron job
+      }
+    }, {
+      timezone: 'UTC'
+    });
+
+    // Check for expired cold messages every hour to refund tokens
+    cron.schedule('0 * * * *', async () => {
+      try {
+        await RefundService.processExpiredColdMessages();
+      } catch (error) {
+        console.error('Error in cold message refund cron job:', error);
+      }
+    }, {
+      timezone: 'UTC'
+    });
+
+    // Cleanup expired shared files every 15 minutes
+    cron.schedule('*/15 * * * *', async () => {
+      try {
+        await cleanupExpiredFiles();
+      } catch (error) {
+        console.error('Error in file cleanup cron job:', error);
       }
     }, {
       timezone: 'UTC'

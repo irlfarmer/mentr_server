@@ -19,6 +19,7 @@ import {
   updateUserVerification,
   getAllMentorEarnings,
   getPlatformStats,
+  handleVerificationDecision,
   requireAdmin
 } from '../controllers/adminController';
 import { authenticate } from '../middleware/auth';
@@ -40,6 +41,7 @@ router.patch('/users/:userId/verify', verifyUser);
 
 // Verifications
 router.get('/verifications/pending', getPendingVerifications);
+router.post('/verifications/:requestId/decision', handleVerificationDecision);
 
 // Transactions
 router.get('/transactions/recent', getRecentTransactions);

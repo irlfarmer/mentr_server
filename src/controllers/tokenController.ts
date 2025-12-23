@@ -276,11 +276,12 @@ export const checkBalance = async (req: AuthRequest, res: Response): Promise<voi
 };
 
 // Deduct tokens for cold message (internal function)
-export const deductTokens = async (userId: string, amount: number, description: string): Promise<boolean> => {
+// Deduct tokens for cold message (internal function)
+export const deductTokens = async (userId: string, amount: number, description: string): Promise<{ success: boolean; transactionId?: string }> => {
   try {
     const user = await User.findById(userId);
     if (!user || user.mentraBalance < amount) {
-      return false;
+      return { success: false };
     }
 
     // Update balance
@@ -297,9 +298,9 @@ export const deductTokens = async (userId: string, amount: number, description: 
     });
     await transaction.save();
 
-    return true;
+    return { success: true, transactionId: (transaction._id as any).toString() };
   } catch (error) {
     console.error('Deduct tokens error:', error);
-    return false;
+    return { success: false };
   }
 };
