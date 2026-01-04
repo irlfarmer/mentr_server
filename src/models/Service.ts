@@ -56,7 +56,7 @@ const ServiceSchema = new Schema<IServiceDocument>({
   hourlyRate: {
     type: Number,
     required: true,
-    min: 1,
+    min: 0,
     max: 1000
   },
   duration: {

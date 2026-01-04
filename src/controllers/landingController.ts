@@ -156,7 +156,7 @@ export const getPlatformStats = async (req: Request, res: Response): Promise<voi
     ] = await Promise.all([
       User.countDocuments({}),
       User.countDocuments({ userType: { $in: ['mentor', 'both'] } }),
-      Booking.countDocuments({ status: 'completed' }),
+      Booking.countDocuments({ status: { $in: ['completed', 'reviewable', 'reviewed'] } }),
       Service.countDocuments({ isActive: true })
     ]);
 
