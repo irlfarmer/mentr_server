@@ -103,6 +103,20 @@ export const createPaymentIntent = async (req: AuthRequest, res: Response): Prom
       finalAmount = amount;
     }
 
+    // Check for free booking
+    if (finalAmount === 0) {
+      res.json({
+        success: true,
+        data: {
+          clientSecret: 'free_booking_secret',
+          paymentIntentId: 'free_booking',
+          amount: 0,
+          currency: currency
+        }
+      });
+      return;
+    }
+
     const paymentIntent = await StripeService.createPaymentIntent(paymentIntentParams);
 
     res.json({
@@ -161,6 +175,29 @@ export const confirmPayment = async (req: AuthRequest, res: Response): Promise<v
       res.status(403).json({
         success: false,
         error: 'Not authorized to update this booking'
+      });
+      return;
+    }
+
+    // Handle free bookings
+    if (paymentIntentId === 'free_booking') {
+      if (booking.amount !== 0) {
+         res.status(400).json({
+          success: false,
+          error: 'Invalid payment attempt for paid booking'
+        });
+        return;
+      }
+      
+      booking.paymentStatus = 'paid';
+      booking.stripePaymentIntentId = 'free_booking_' + Date.now();
+      booking.status = 'confirmed'; // Auto-confirm free bookings
+      await booking.save();
+
+      res.json({
+        success: true,
+        data: booking,
+        message: 'Free booking confirmed successfully'
       });
       return;
     }
