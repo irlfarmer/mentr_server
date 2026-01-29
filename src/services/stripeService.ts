@@ -59,8 +59,15 @@ export class StripeService {
         clientSecret: paymentIntent.client_secret!,
         paymentIntentId: paymentIntent.id,
       };
-    } catch (error) {
-      throw new Error('Failed to create payment intent');
+    } catch (error: any) {
+      console.error('Stripe createPaymentIntent error:', {
+        message: error.message,
+        type: error.type,
+        code: error.code,
+        statusCode: error.statusCode,
+        raw: error.raw?.message
+      });
+      throw new Error(`Failed to create payment intent: ${error.message}`);
     }
   }
 
