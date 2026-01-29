@@ -108,7 +108,7 @@ export const getMeetingFiles = async (req: Request, res: Response): Promise<void
 // Proxy endpoint to serve raw files from Cloudinary (bypasses strict security)
 export const proxyCloudinaryFile = async (req: Request, res: Response): Promise<void> => {
   try {
-    const publicId = decodeURIComponent(req.params.publicId);
+    const publicId = decodeURIComponent(req.params.publicId as string);
     
     if (!publicId) {
       res.status(400).json({ success: false, message: 'Public ID is required' });
@@ -145,7 +145,7 @@ export const proxyCloudinaryFile = async (req: Request, res: Response): Promise<
     
     // Fallback: try direct redirect with signed URL
     try {
-      const publicId = decodeURIComponent(req.params.publicId);
+      const publicId = decodeURIComponent(req.params.publicId as string);
       const signedUrl = cloudinary.url(publicId, {
         resource_type: 'raw',
         type: 'upload',

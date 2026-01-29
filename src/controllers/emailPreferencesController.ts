@@ -106,7 +106,7 @@ export class EmailPreferencesController {
     try {
       const { token } = req.params;
 
-      const success = await EmailPreferencesService.unsubscribeAll(token);
+      const success = await EmailPreferencesService.unsubscribeAll(token as string);
       if (!success) {
         res.status(404).json({
           success: false,
@@ -135,7 +135,7 @@ export class EmailPreferencesController {
 
       // Validate category
       const validCategories = ['booking', 'reschedule', 'chat', 'payout', 'dispute', 'system', 'verification', 'marketing'];
-      if (!validCategories.includes(category)) {
+      if (!validCategories.includes(category as string)) {
         res.status(400).json({
           success: false,
           error: 'Invalid category'
@@ -143,7 +143,7 @@ export class EmailPreferencesController {
         return;
       }
 
-      const success = await EmailPreferencesService.unsubscribeCategory(token, category as any);
+      const success = await EmailPreferencesService.unsubscribeCategory(token as string, category as any);
       if (!success) {
         res.status(404).json({
           success: false,
@@ -170,7 +170,7 @@ export class EmailPreferencesController {
     try {
       const { token } = req.params;
 
-      const success = await EmailPreferencesService.resubscribe(token);
+      const success = await EmailPreferencesService.resubscribe(token as string);
       if (!success) {
         res.status(404).json({
           success: false,
@@ -197,7 +197,7 @@ export class EmailPreferencesController {
     try {
       const { token } = req.params;
 
-      const preferences = await EmailPreferencesService.getEmailPreferencesByToken(token);
+      const preferences = await EmailPreferencesService.getEmailPreferencesByToken(token as string);
       if (!preferences) {
         res.status(404).json({
           success: false,
@@ -285,7 +285,7 @@ export class EmailPreferencesController {
         return;
       }
 
-      const preferences = await EmailPreferencesService.getEmailPreferences(userId);
+      const preferences = await EmailPreferencesService.getEmailPreferences(userId as string);
       if (!preferences) {
         res.status(404).json({
           success: false,
@@ -334,7 +334,7 @@ export class EmailPreferencesController {
       }
 
       const updateData = req.body;
-      const preferences = await EmailPreferencesService.updateEmailPreferences(userId, updateData);
+      const preferences = await EmailPreferencesService.updateEmailPreferences(userId as string, updateData);
 
       res.json({
         success: true,

@@ -71,7 +71,7 @@ router.post('/:id/pay-with-tokens', authenticate, async (req, res) => {
     
     // Process token payment
     const result = await TokenPaymentService.processTokenPayment(
-      id,
+      id as string,
       userId,
       booking.amount
     );

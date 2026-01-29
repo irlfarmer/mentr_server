@@ -95,7 +95,7 @@ export const requestReschedule = async (req: AuthRequest, res: Response): Promis
 
       await rescheduleNotificationService.sendNewRescheduleRequestNotification({
         rescheduleRequestId: (rescheduleRequest._id as any).toString(),
-        bookingId: bookingId,
+        bookingId: bookingId as string,
         requestedBy: userId,
         requestedTo: requestedTo,
         newScheduledAt: new Date(newScheduledAt),
@@ -398,7 +398,7 @@ export const cancelBooking = async (req: AuthRequest, res: Response): Promise<vo
     let refundResult = null;
     if (booking.paymentStatus === 'paid') {
       refundResult = await RefundService.processRefund({
-        bookingId: bookingId,
+        bookingId: bookingId as string,
         refundType: refundType as 'payment_method' | 'tokens',
         reason: reason || 'Booking cancelled',
         cancelledBy: cancelledBy

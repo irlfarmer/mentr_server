@@ -615,7 +615,7 @@ export const markAsRead = async (req: AuthRequest, res: Response) => {
           message.senderId._id.toString(),
           userId.toString(),
           message._id.toString(),
-          conversationId
+          conversationId as string
         );
       }
     } catch (notificationError) {

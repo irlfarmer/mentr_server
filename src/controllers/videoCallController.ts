@@ -130,7 +130,7 @@ export const getVideoCallByBooking = async (req: AuthRequest, res: Response): Pr
       return;
     }
 
-    if (!bookingId || !mongoose.Types.ObjectId.isValid(bookingId)) {
+    if (!bookingId || !mongoose.Types.ObjectId.isValid(bookingId as string)) {
       res.status(400).json({ success: false, error: 'Valid booking ID is required' });
       return;
     }
@@ -178,7 +178,7 @@ export const getVideoCall = async (req: AuthRequest, res: Response): Promise<voi
       return;
     }
 
-    if (!mongoose.Types.ObjectId.isValid(id)) {
+    if (!mongoose.Types.ObjectId.isValid(id as string)) {
       res.status(400).json({ success: false, error: 'Valid video call ID is required' });
       return;
     }
@@ -223,7 +223,7 @@ export const generateMeetingToken = async (req: AuthRequest, res: Response): Pro
       return;
     }
 
-    if (!mongoose.Types.ObjectId.isValid(videoCallId)) {
+    if (!mongoose.Types.ObjectId.isValid(videoCallId as string)) {
       res.status(400).json({ success: false, error: 'Valid video call ID is required' });
       return;
     }

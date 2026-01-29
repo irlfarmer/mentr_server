@@ -118,7 +118,7 @@ router.delete('/image/:publicId', authenticate, async (req, res): Promise<void> 
     const { publicId } = req.params;
     
     // Delete from Cloudinary
-    const result = await deleteImage(publicId);
+    const result = await deleteImage(publicId as string);
     
     if (result.result === 'ok') {
       res.json({

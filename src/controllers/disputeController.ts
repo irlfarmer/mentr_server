@@ -457,7 +457,7 @@ export const resolveDispute = async (req: AuthRequest, res: Response): Promise<v
     await dispute.save();
 
     // Handle payment processing based on decision
-    await PayoutService.handleDisputeResolution(disputeId, decision, amount);
+    await PayoutService.handleDisputeResolution(disputeId as string, decision, amount);
 
     // Send dispute resolution notification
     try {
