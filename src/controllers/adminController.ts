@@ -1355,7 +1355,7 @@ export const getPlatformStats = async (req: Request, res: Response): Promise<voi
 // Refund a transaction
 export const refundTransaction = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { transactionId } = req.params;
+    const transactionId = req.params.transactionId as string;
     const { reason = 'Admin refund' } = req.body;
 
     const booking = await Booking.findById(transactionId);
@@ -1390,7 +1390,7 @@ export const refundTransaction = async (req: Request, res: Response): Promise<vo
 // Process payout manually
 export const processManualPayout = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { transactionId } = req.params;
+    const transactionId = req.params.transactionId as string;
 
     const booking = await Booking.findById(transactionId).populate('mentorId', 'firstName lastName email');
     if (!booking) {
@@ -1418,7 +1418,7 @@ export const processManualPayout = async (req: Request, res: Response): Promise<
 // Retry a failed transaction (payout or payment)
 export const retryFailedTransaction = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { transactionId } = req.params;
+    const transactionId = req.params.transactionId as string;
 
     const booking = await Booking.findById(transactionId).populate('mentorId', 'firstName lastName email');
     if (!booking) {
