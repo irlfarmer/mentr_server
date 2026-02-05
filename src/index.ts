@@ -57,6 +57,7 @@ dotenv.config();
 // LinkedIn OAuth now handled by custom service
 
 const app = express();
+app.set('trust proxy', 1);
 const server = createServer(app);
 const io = new Server(server, {
   cors: {
