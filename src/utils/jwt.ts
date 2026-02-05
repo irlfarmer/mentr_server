@@ -4,10 +4,16 @@ import { JWTPayload } from '../types';
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 
-export const generateToken = (payload: Omit<JWTPayload, 'iat' | 'exp'>): string => {
+export const generateToken = (payload: Omit<JWTPayload, 'iat' | 'exp'>, expiresIn: string = '15m'): string => {
   return jwt.sign(payload, JWT_SECRET, {
-    expiresIn: JWT_EXPIRES_IN
+    expiresIn
   } as jwt.SignOptions);
+};
+
+export const generateRefreshToken = (userId: string): string => {
+  return jwt.sign({ userId, type: 'refresh' }, JWT_SECRET, {
+    expiresIn: '7d'
+  });
 };
 
 export const verifyToken = (token: string): JWTPayload => {

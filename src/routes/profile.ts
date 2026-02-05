@@ -9,7 +9,8 @@ import {
   removeDocument,
   getPublicProfile,
   searchProfiles,
-  getMentorAvailability
+  getMentorAvailability,
+  deleteAccount
 } from '../controllers/profileController';
 
 const router = Router();
@@ -21,6 +22,7 @@ router.put('/availability', authenticate, updateAvailability);
 router.put('/me/image', authenticate, uploadProfileImage);
 router.post('/me/documents', authenticate, addDocument);
 router.delete('/me/documents/:documentId', authenticate, removeDocument);
+router.delete('/me', authenticate, deleteAccount);
 
 // Public routes (no authentication required)
 router.get('/:userId', getPublicProfile);

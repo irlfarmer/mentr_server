@@ -2,9 +2,10 @@ import { Request, Response } from 'express';
 import { v2 as cloudinary } from 'cloudinary';
 import { SharedFile } from '../models/SharedFile';
 import { Booking } from '../models/Booking';
+import { AuthRequest } from '../types';
 
 // Upload shared file
-export const uploadSharedFile = async (req: Request, res: Response): Promise<void> => {
+export const uploadSharedFile = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     if (!req.file) {
       res.status(400).json({ success: false, message: 'No file uploaded' });

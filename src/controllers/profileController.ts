@@ -1,6 +1,17 @@
 import { Request, Response } from 'express';
 import { User } from '../models/User';
 import { AuthRequest } from '../types';
+import { Service } from '../models/Service';
+import { Booking } from '../models/Booking';
+import Message from '../models/Message';
+import { Notification } from '../models/Notification';
+import { TokenTransaction } from '../models/TokenTransaction';
+import { EmailPreferences } from '../models/EmailPreferences';
+import { NotificationPreferences } from '../models/NotificationPreferences';
+import { Review } from '../models/Review';
+import Note from '../models/Note';
+import mongooseLib from 'mongoose';
+import { sanitizeUser, maskString } from '../utils/masking';
 
 // Get user profile
 export const getProfile = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -27,7 +38,7 @@ export const getProfile = async (req: AuthRequest, res: Response): Promise<void>
 
     res.json({
       success: true,
-      data: user,
+      data: sanitizeUser(user.toObject()),
       message: 'Profile retrieved successfully'
     });
   } catch (error) {
@@ -63,7 +74,7 @@ export const getPublicProfile = async (req: Request, res: Response): Promise<voi
 
     res.json({
       success: true,
-      data: user,
+      data: sanitizeUser(user.toObject()),
       message: 'Public profile retrieved successfully'
     });
   } catch (error) {
@@ -203,7 +214,10 @@ export const updateProfile = async (req: AuthRequest, res: Response): Promise<vo
       // Student-specific fields
       learningInterests,
       educationBackground,
-      careerGoals
+      careerGoals,
+      isOnboarded,
+      isAnonymous,
+      anonymityReason
     } = req.body;
 
     const updateData: any = {};
@@ -221,6 +235,9 @@ export const updateProfile = async (req: AuthRequest, res: Response): Promise<vo
     if (professionalHeadline) updateData.professionalHeadline = professionalHeadline;
     if (currentCompany) updateData.currentCompany = currentCompany;
     if (currentPosition) updateData.currentPosition = currentPosition;
+    if (isOnboarded !== undefined) updateData.isOnboarded = isOnboarded;
+    if (isAnonymous !== undefined) updateData.isAnonymous = isAnonymous;
+    if (anonymityReason !== undefined) updateData.anonymityReason = anonymityReason;
     if (workExperience) {
       // Filter out empty work experience entries while preserving all fields including documents
       const filteredWorkExperience = workExperience.filter((work: any) => {
@@ -505,12 +522,17 @@ export const getMentorAvailability = async (req: Request, res: Response): Promis
       return;
     }
 
+    const isAnon = user.isAnonymous;
     res.json({
       success: true,
       data: {
         availability: user.availability || [],
         timezone: user.timezone || 'UTC',
-        mentorName: `${user.firstName} ${user.lastName}`
+        mentorName: isAnon 
+          ? `${maskString(user.firstName)} ${maskString(user.lastName)}`
+          : `${user.firstName} ${user.lastName}`,
+        isAnonymous: isAnon,
+        anonymityReason: user.anonymityReason
       },
       message: 'Mentor availability retrieved successfully'
     });
@@ -560,7 +582,7 @@ export const searchProfiles = async (req: Request, res: Response): Promise<void>
     res.json({
       success: true,
       data: {
-        users,
+        users: users.map(u => sanitizeUser(u)),
         pagination: {
           page: Number(page),
           limit: Number(limit),
@@ -574,6 +596,62 @@ export const searchProfiles = async (req: Request, res: Response): Promise<void>
     res.status(500).json({
       success: false,
       error: 'Internal server error'
+    });
+  }
+};
+
+// Delete account
+export const deleteAccount = async (req: AuthRequest, res: Response): Promise<void> => {
+  const session = await mongooseLib.startSession();
+  session.startTransaction();
+  try {
+    const userId = (req.user as any)?._id;
+    
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        error: 'User not authenticated'
+      });
+      return;
+    }
+
+    // Comprehensive cleanup of associated data
+    await Service.deleteMany({ mentorId: userId }).session(session);
+    await Booking.deleteMany({ $or: [{ mentorId: userId }, { studentId: userId }] }).session(session);
+    await Message.deleteMany({ $or: [{ senderId: userId }, { receiverId: userId }] }).session(session);
+    await Notification.deleteMany({ userId }).session(session);
+    await TokenTransaction.deleteMany({ userId }).session(session);
+    await EmailPreferences.deleteMany({ userId }).session(session);
+    await NotificationPreferences.deleteMany({ userId }).session(session);
+    await Review.deleteMany({ $or: [{ mentorId: userId }, { studentId: userId }] }).session(session);
+    await Note.deleteMany({ userId }).session(session);
+
+    const user = await User.findByIdAndDelete(userId).session(session);
+    
+    if (!user) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+      return;
+    }
+
+    await session.commitTransaction();
+    session.endSession();
+
+    res.json({
+      success: true,
+      message: 'Account deleted successfully'
+    });
+  } catch (error: any) {
+    console.error('[DeleteAccount] Critical error during account deletion:', error);
+    await session.abortTransaction();
+    session.endSession();
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error'
     });
   }
 };

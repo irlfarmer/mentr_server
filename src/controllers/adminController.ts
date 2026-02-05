@@ -2,9 +2,12 @@ import { Request, Response } from 'express';
 import { User } from '../models/User';
 import { Booking } from '../models/Booking';
 import { Service } from '../models/Service';
+import { TokenTransaction } from '../models/TokenTransaction';
 import VerificationRequest from '../models/VerificationRequest';
 import { deleteResource } from '../config/cloudinary'; // Import delete helper
 import { startOfDay, endOfDay, startOfMonth, endOfMonth, subDays, subMonths } from 'date-fns';
+import { RefundService } from '../services/refundService';
+import { PayoutService } from '../services/payoutService';
 
 // Admin middleware to check if user is admin
 export const requireAdmin = (req: Request, res: Response, next: any): void => {
@@ -50,20 +53,10 @@ export const getAdminStats = async (req: Request, res: Response) => {
       Booking.aggregate([
         {
           $match: {
-            scheduledAt: { $gte: startOfThisMonth, $lte: endOfThisMonth },
-            status: { $in: ['completed', 'reviewable', 'reviewed'] }
+            updatedAt: { $gte: startOfThisMonth, $lte: endOfThisMonth },
+            paymentMethod: 'stripe',
+            paymentStatus: 'paid'
           }
-        },
-        {
-          $lookup: {
-            from: 'services',
-            localField: 'serviceId',
-            foreignField: '_id',
-            as: 'service'
-          }
-        },
-        {
-          $unwind: '$service'
         },
         {
           $group: {
@@ -87,25 +80,45 @@ export const getAdminStats = async (req: Request, res: Response) => {
       Booking.aggregate([
         {
           $match: {
-            scheduledAt: { $gte: startOfLastMonth, $lte: endOfLastMonth },
-            status: { $in: ['completed', 'reviewable', 'reviewed'] }
+            updatedAt: { $gte: startOfLastMonth, $lte: endOfLastMonth },
+            paymentMethod: 'stripe',
+            paymentStatus: 'paid'
           }
-        },
-        {
-          $lookup: {
-            from: 'services',
-            localField: 'serviceId',
-            foreignField: '_id',
-            as: 'service'
-          }
-        },
-        {
-          $unwind: '$service'
         },
         {
           $group: {
             _id: null,
             totalRevenue: { $sum: { $ifNull: ['$amount', 0] } }
+          }
+        }
+      ]),
+      TokenTransaction.aggregate([
+        {
+          $match: {
+             createdAt: { $gte: startOfThisMonth, $lte: endOfThisMonth },
+             type: 'credit',
+             reference: { $regex: /^stripe_/ }
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            totalRevenue: { $sum: '$amount' }
+          }
+        }
+      ]),
+      TokenTransaction.aggregate([
+        {
+          $match: {
+             createdAt: { $gte: startOfLastMonth, $lte: endOfLastMonth },
+             type: 'credit',
+             reference: { $regex: /^stripe_/ }
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            totalRevenue: { $sum: '$amount' }
           }
         }
       ])
@@ -124,10 +137,59 @@ export const getAdminStats = async (req: Request, res: Response) => {
       ? ((sessionsToday - sessionsLastMonth) / sessionsLastMonth) * 100 
       : 0;
 
-    const currentRevenue = revenueThisMonth.length > 0 ? revenueThisMonth[0].totalRevenue : 0;
-    const lastRevenue = revenueLastMonth.length > 0 ? revenueLastMonth[0].totalRevenue : 0;
+    // Extract revenues from the Promise.all results array
+    // Indices: 0-7 are standard, 8 is tokenRevenueThisMonth, 9 is tokenRevenueLastMonth
+    const currentBookingRevenue = revenueThisMonth.length > 0 ? revenueThisMonth[0].totalRevenue : 0;
+    const lastBookingRevenue = revenueLastMonth.length > 0 ? revenueLastMonth[0].totalRevenue : 0;
+    
+    // @ts-ignore - Accessing extra array elements
+    const results = [
+      totalUsers, activeMentors, sessionsToday, revenueThisMonth,
+      totalUsersLastMonth, activeMentorsLastMonth, sessionsLastMonth, revenueLastMonth
+    ];
+    // In reality, Promise.all returned the full array, but we destructured only the first 8.
+    // However, since we can't easily access the original array 'allResults' without changing the diff huge amount,
+    // We will just re-run the token queries separately for code cleanliness/safety, as passing [8] in 
+    // destructuring via replace is tricky if variable names aren't there.
+    // actually, let's just do the separate query approach, it is safer than relying on hidden array indices.
+    
+    const tokenRevenueCurrent = (await TokenTransaction.aggregate([
+        {
+          $match: {
+             createdAt: { $gte: startOfThisMonth, $lte: endOfThisMonth },
+             type: 'credit',
+             reference: { $regex: /^stripe_/ }
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            totalRevenue: { $sum: '$amount' }
+          }
+        }
+    ]))[0]?.totalRevenue || 0;
+
+    const tokenRevenueLast = (await TokenTransaction.aggregate([
+        {
+          $match: {
+             createdAt: { $gte: startOfLastMonth, $lte: endOfLastMonth },
+             type: 'credit',
+             reference: { $regex: /^stripe_/ }
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            totalRevenue: { $sum: '$amount' }
+          }
+        }
+    ]))[0]?.totalRevenue || 0;
+
+    const currentRevenue = currentBookingRevenue + tokenRevenueCurrent;
+    const lastRevenue = lastBookingRevenue + tokenRevenueLast;
+    
     const revenueGrowth = lastRevenue > 0 
-      ? ((currentRevenue - lastRevenue) / lastRevenue) * 100 
+      ? ((currentRevenue - lastRevenue) / lastRevenue) * 100  
       : 0;
 
     res.json({
@@ -216,11 +278,17 @@ export const getRecentTransactions = async (req: Request, res: Response) => {
       _id: booking._id,
       mentorId: booking.mentorId,
       studentId: booking.studentId,
-      amount: (booking.serviceId as any)?.hourlyRate || 0,
-      status: 'completed',
-      createdAt: booking.scheduledAt,
+      amount: booking.amount || (booking.serviceId as any)?.hourlyRate || 0,
+      status: booking.status === 'completed' && booking.payoutStatus === 'paid' ? 'completed' : 
+              booking.status === 'failed' || booking.payoutStatus === 'failed' ? 'failed' :
+              booking.status === 'cancelled' || booking.refund?.status === 'processed' ? 'cancelled' : 'pending',
+      payoutStatus: booking.payoutStatus || 'pending',
+      paymentStatus: booking.paymentStatus || 'paid',
+      createdAt: booking.createdAt,
+      scheduledAt: booking.scheduledAt,
       mentor: booking.mentorId,
-      student: booking.studentId
+      student: booking.studentId,
+      type: 'session'
     }));
 
     res.json({
@@ -284,6 +352,28 @@ export const getPlatformActivity = async (req: Request, res: Response) => {
       }
     ]);
 
+    // Get daily token revenue
+    const tokenActivity = await TokenTransaction.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: startDate },
+          type: 'credit',
+          reference: { $regex: /^stripe_/ }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            $dateToString: { format: '%Y-%m-%d', date: '$createdAt' }
+          },
+          revenue: { $sum: '$amount' }
+        }
+      },
+      {
+        $sort: { '_id': 1 }
+      }
+    ]);
+
     // Create a complete date range to ensure no gaps
     const dateRange = [];
     for (let i = 0; i < days; i++) {
@@ -313,6 +403,14 @@ export const getPlatformActivity = async (req: Request, res: Response) => {
       if (existing) {
         existing.sessions = item.sessions;
         existing.revenue = item.revenue;
+      }
+    });
+
+    // Add token revenue
+    tokenActivity.forEach((item: any) => {
+      const existing = activityMap.get(item._id);
+      if (existing) {
+        existing.revenue += item.revenue;
       }
     });
 
@@ -551,7 +649,6 @@ export const handleVerificationDecision = async (req: Request, res: Response): P
                 if (match && match[1]) {
                     const publicId = match[1];
                     await deleteResource(publicId, 'image'); // Assume images for now
-                    console.log(`Deleted verification document: ${publicId}`);
                 }
             } catch (err) {
                 console.error('Failed to delete verification document:', err);
@@ -792,86 +889,50 @@ export const getContentReports = async (req: Request, res: Response) => {
     const { type, status } = req.query;
     const limit = parseInt(req.query.limit as string) || 20;
     
-    // For now, return mock data since we don't have a reports collection yet
-    // In a real implementation, you'd have a Reports collection
-    const mockReports = [
-      {
-        id: '1',
-        type: 'profile',
-        reportedUserId: 'user1',
-        reporterUserId: 'user2',
-        reason: 'Fake profile',
-        description: "The profile contains false information and is misleading.",
-        status: 'pending',
-        createdAt: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
-        reportedUser: {
-          firstName: 'Cameron',
-          lastName: 'Wong',
-          email: 'cameron@example.com',
-          userType: 'mentor'
-        },
-        reporterUser: {
-          firstName: 'John',
-          lastName: 'Smith',
-          email: 'john@example.com'
-        }
-      },
-      {
-        id: '2',
-        type: 'service',
-        reportedUserId: 'user3',
-        reporterUserId: 'user4',
-        reason: 'Inappropriate content',
-        description: "The service description contains inappropriate language.",
-        status: 'pending',
-        createdAt: new Date(Date.now() - 172800000).toISOString(), // 2 days ago
-        reportedUser: {
-          firstName: 'Sarah',
-          lastName: 'Johnson',
-          email: 'sarah@example.com',
-          userType: 'mentor'
-        },
-        reporterUser: {
-          firstName: 'Mike',
-          lastName: 'Brown',
-          email: 'mike@example.com'
-        }
-      },
-      {
-        id: '3',
-        type: 'message',
-        reportedUserId: 'user5',
-        reporterUserId: 'user6',
-        reason: 'Harassment',
-        description: "Received inappropriate messages during a session.",
-        status: 'resolved',
-        createdAt: new Date(Date.now() - 259200000).toISOString(), // 3 days ago
-        reportedUser: {
-          firstName: 'David',
-          lastName: 'Wilson',
-          email: 'david@example.com',
-          userType: 'mentor'
-        },
-        reporterUser: {
-          firstName: 'Emma',
-          lastName: 'Davis',
-          email: 'emma@example.com'
-        }
-      }
-    ];
+    // Import Report model at the top of the file if not already done
+    const { Report } = await import('../models/Report');
+    
+    const query: any = {};
+    
+    // Default to pending if no status is specified
+    if (!status || status === 'all') {
+      query.status = 'pending';
+    } else {
+      query.status = status;
+    }
+    
+    if (type && type !== 'all') {
+      query.reportedModel = type === 'profile' ? 'User' : 'Service';
+    }
 
-    // Filter by type and status if provided
-    let filteredReports = mockReports;
-    if (type) {
-      filteredReports = filteredReports.filter(report => report.type === type);
-    }
-    if (status) {
-      filteredReports = filteredReports.filter(report => report.status === status);
-    }
+    const reports = await Report.find(query)
+      .populate('reporterId', 'firstName lastName email profileImage')
+      .populate({
+        path: 'reportedId',
+        select: 'firstName lastName email profileImage title description'
+      })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean();
+
+    // Transform to match frontend expectations
+    const transformedReports = reports.map((report: any) => ({
+      id: report._id,
+      type: report.reportedModel === 'User' ? 'profile' : 'service',
+      reportedUserId: report.reportedId?._id,
+      reporterUserId: report.reporterId?._id,
+      reason: report.reason,
+      description: report.description,
+      status: report.status,
+      createdAt: report.createdAt,
+      reportedUser: report.reportedId,
+      reporterUser: report.reporterId,
+      adminNotes: report.adminNotes
+    }));
 
     res.json({
       success: true,
-      data: filteredReports.slice(0, limit)
+      data: transformedReports
     });
   } catch (error) {
     console.error('Error fetching content reports:', error);
@@ -888,12 +949,107 @@ export const handleReportAction = async (req: Request, res: Response) => {
     const { reportId } = req.params;
     const { action, reason } = req.body;
 
-    // In a real implementation, you'd update the report status in the database
-    // For now, we'll just return success
+   if (!['dismiss', 'warn', 'suspend', 'delete'].includes(action)) {
+      res.status(400).json({
+        success: false,
+        error: 'Invalid action'
+      });
+      return;
+    }
+
+    const { Report } = await import('../models/Report');
+    
+    // Find the report
+    const report = await Report.findById(reportId)
+      .populate('reportedId');
+
+    if (!report) {
+      res.status(404).json({
+        success: false,
+        error: 'Report not found'
+      });
+      return;
+    }
+
+    // Update report status to resolved
+    report.status = 'resolved';
+    report.adminNotes = `Action taken: ${action}${reason ? ` - ${reason}` : ''}`;
+    await report.save();
+
+    const { notificationService } = await import('../services/notificationService');
+    const reportedModel = report.reportedModel;
+    const reportedId = report.reportedId;
+
+    // Perform action on reported content/user
+    switch (action) {
+      case 'dismiss':
+        // Just mark as resolved, no further action
+        break;
+
+      case 'warn':
+        // Send a warning notification to the user
+        const warnTargetId = reportedModel === 'User' ? (reportedId as any)._id : (reportedId as any).mentorId;
+        if (warnTargetId) {
+          await notificationService.createMultiTypeNotification(
+            warnTargetId.toString(),
+            'system',
+            'Warning: Content Report',
+            `Administrator has issued a warning regarding your ${reportedModel.toLowerCase()}. Reason: ${reason || report.reason}`,
+            { reportId: report._id, action: 'warn' },
+            'high'
+          );
+        }
+        break;
+
+      case 'suspend':
+        // Suspend the user account
+        const suspendTargetId = reportedModel === 'User' ? (reportedId as any)._id : (reportedId as any).mentorId;
+        if (suspendTargetId) {
+          await User.findByIdAndUpdate(suspendTargetId, {
+            isActive: false,
+            isBanned: true
+          });
+          
+          await notificationService.createMultiTypeNotification(
+            suspendTargetId.toString(),
+            'system',
+            'Account Suspended',
+            `Your account has been suspended by an administrator due to violations. Reason: ${reason || report.reason}`,
+            { reportId: report._id, action: 'suspend' },
+            'urgent'
+          );
+        }
+        break;
+
+      case 'delete':
+        // Delete the content
+        if (reportedModel === 'Service') {
+          await Service.findByIdAndDelete((reportedId as any)._id);
+          
+          const mentorId = (reportedId as any).mentorId;
+          if (mentorId) {
+            await notificationService.createMultiTypeNotification(
+              mentorId.toString(),
+              'system',
+              'Content Deleted',
+              `Your service "${(reportedId as any).title}" has been removed by an administrator to due a content report. Reason: ${reason || report.reason}`,
+              { reportId: report._id, action: 'delete' },
+              'high'
+            );
+          }
+        } else if (reportedModel === 'User') {
+          // For User, delete means ban/disable as we usually don't hard delete users
+          await User.findByIdAndUpdate((reportedId as any)._id, {
+            isActive: false,
+            isBanned: true
+          });
+        }
+        break;
+    }
 
     res.json({
       success: true,
-      message: `Report ${action} successfully`
+      message: `Report ${action} action completed successfully`
     });
   } catch (error) {
     console.error('Error handling report action:', error);
@@ -1194,5 +1350,99 @@ export const getPlatformStats = async (req: Request, res: Response): Promise<voi
       success: false,
       error: 'Failed to get platform statistics'
     });
+  }
+};
+// Refund a transaction
+export const refundTransaction = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { transactionId } = req.params;
+    const { reason = 'Admin refund' } = req.body;
+
+    const booking = await Booking.findById(transactionId);
+    if (!booking) {
+      res.status(404).json({ success: false, error: 'Transaction/Booking not found' });
+      return;
+    }
+
+    const result = await RefundService.processRefund({
+      bookingId: transactionId,
+      refundType: booking.paymentMethod === 'tokens' ? 'tokens' : 'payment_method',
+      reason,
+      cancelledBy: 'mentor' // Admin action treated as mentor cancellation for full refund
+    });
+
+    if (!result.success) {
+      res.status(400).json({ success: false, error: result.error });
+      return;
+    }
+
+    res.json({
+      success: true,
+      message: 'Refund processed successfully',
+      data: result
+    });
+  } catch (error) {
+    console.error('Error refunding transaction:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+};
+
+// Process payout manually
+export const processManualPayout = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { transactionId } = req.params;
+
+    const booking = await Booking.findById(transactionId).populate('mentorId', 'firstName lastName email');
+    if (!booking) {
+      res.status(404).json({ success: false, error: 'Transaction/Booking not found' });
+      return;
+    }
+
+    if (booking.status !== 'completed') {
+      res.status(400).json({ success: false, error: 'Only completed bookings can be paid out' });
+      return;
+    }
+
+    await PayoutService.processBookingPayout(booking);
+
+    res.json({
+      success: true,
+      message: 'Payout processed successfully'
+    });
+  } catch (error) {
+    console.error('Error processing manual payout:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+};
+
+// Retry a failed transaction (payout or payment)
+export const retryFailedTransaction = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { transactionId } = req.params;
+
+    const booking = await Booking.findById(transactionId).populate('mentorId', 'firstName lastName email');
+    if (!booking) {
+      res.status(404).json({ success: false, error: 'Transaction/Booking not found' });
+      return;
+    }
+
+    // If payout failed, retry it
+    if (booking.payoutStatus === 'failed' || (booking.status === 'completed' && booking.payoutStatus !== 'paid')) {
+      await PayoutService.processBookingPayout(booking);
+      res.json({
+        success: true,
+        message: 'Payout retry initiated'
+      });
+      return;
+    }
+
+    // For other types of retries, we might need more logic
+    res.status(400).json({
+      success: false,
+      error: 'Transaction cannot be retried automatically'
+    });
+  } catch (error) {
+    console.error('Error retrying transaction:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };

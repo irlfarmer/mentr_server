@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { Review } from '../models/Review';
 import { Booking } from '../models/Booking';
 import { AuthRequest } from '../types';
+import { sanitizeUser } from '../utils/masking';
 
 // Create a new review
 export const createReview = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -99,12 +100,17 @@ export const createReview = async (req: AuthRequest, res: Response): Promise<voi
     await review.populate([
       { path: 'serviceId', select: 'title' },
       { path: 'studentId', select: 'firstName lastName' },
-      { path: 'mentorId', select: 'firstName lastName' }
+      { path: 'mentorId', select: 'firstName lastName profileImage isAnonymous anonymityReason' }
     ]);
+
+    const reviewObj = review.toObject() as any;
+    if (reviewObj.mentorId) {
+      reviewObj.mentorId = sanitizeUser(reviewObj.mentorId);
+    }
 
     res.status(201).json({
       success: true,
-      data: review,
+      data: reviewObj,
       message: 'Review created successfully'
     });
   } catch (error) {
@@ -124,15 +130,22 @@ export const getServiceReviews = async (req: Request, res: Response): Promise<vo
 
     const reviews = await Review.find({ serviceId })
       .populate('studentId', 'firstName lastName profileImage')
+      .populate('mentorId', 'firstName lastName profileImage isAnonymous anonymityReason')
       .sort({ createdAt: -1 })
       .limit(Number(limit) * 1)
       .skip((Number(page) - 1) * Number(limit));
 
     const total = await Review.countDocuments({ serviceId });
 
+    const sanitizedReviews = reviews.map(review => {
+      const r = review.toObject() as any;
+      if (r.mentorId) r.mentorId = sanitizeUser(r.mentorId);
+      return r;
+    });
+
     res.json({
       success: true,
-      data: reviews,
+      data: sanitizedReviews,
       pagination: {
         page: Number(page),
         limit: Number(limit),
@@ -158,15 +171,22 @@ export const getMentorReviews = async (req: Request, res: Response): Promise<voi
     const reviews = await Review.find({ mentorId })
       .populate('studentId', 'firstName lastName profileImage')
       .populate('serviceId', 'title')
+      .populate('mentorId', 'firstName lastName profileImage isAnonymous anonymityReason')
       .sort({ createdAt: -1 })
       .limit(Number(limit) * 1)
       .skip((Number(page) - 1) * Number(limit));
 
     const total = await Review.countDocuments({ mentorId });
 
+    const sanitizedReviews = reviews.map(review => {
+      const r = review.toObject() as any;
+      if (r.mentorId) r.mentorId = sanitizeUser(r.mentorId);
+      return r;
+    });
+
     res.json({
       success: true,
-      data: reviews,
+      data: sanitizedReviews,
       pagination: {
         page: Number(page),
         limit: Number(limit),
@@ -199,16 +219,22 @@ export const getUserReviews = async (req: AuthRequest, res: Response): Promise<v
 
     const reviews = await Review.find({ studentId: userId })
       .populate('serviceId', 'title')
-      .populate('mentorId', 'firstName lastName profileImage')
+      .populate('mentorId', 'firstName lastName profileImage isAnonymous anonymityReason')
       .sort({ createdAt: -1 })
       .limit(Number(limit) * 1)
       .skip((Number(page) - 1) * Number(limit));
 
     const total = await Review.countDocuments({ studentId: userId });
 
+    const sanitizedReviews = reviews.map(review => {
+      const r = review.toObject() as any;
+      if (r.mentorId) r.mentorId = sanitizeUser(r.mentorId);
+      return r;
+    });
+
     res.json({
       success: true,
-      data: reviews,
+      data: sanitizedReviews,
       pagination: {
         page: Number(page),
         limit: Number(limit),

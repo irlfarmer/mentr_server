@@ -5,7 +5,8 @@ import {
   createTokenTopUpPaymentIntent,
   confirmTokenTopUp,
   getTransactions, 
-  checkBalance 
+  checkBalance,
+  getTotalSpend
 } from '../controllers/tokenController';
 
 const router = Router();
@@ -27,5 +28,8 @@ router.get('/transactions', getTransactions);
 
 // Check if user has sufficient balance
 router.post('/check-balance', checkBalance);
+
+// Get total token spend
+router.get('/spend', getTotalSpend);
 
 export default router;

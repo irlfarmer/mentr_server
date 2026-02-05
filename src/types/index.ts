@@ -20,6 +20,7 @@ export interface IUser {
   availability: IAvailability[];
   documents: IDocument[];
   timezone: string;
+  isOnboarded: boolean;
   mentraBalance?: number;
   createdAt: Date;
   updatedAt: Date;

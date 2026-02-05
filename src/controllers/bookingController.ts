@@ -4,7 +4,7 @@ import { Service } from '../models/Service';
 import { User } from '../models/User';
 import { AuthRequest } from '../types';
 import { toZonedTime, fromZonedTime, format } from 'date-fns-tz';
-import { addMinutes, startOfDay, endOfDay } from 'date-fns';
+import { addMinutes, startOfDay, endOfDay, isToday, isPast } from 'date-fns';
 import { MentorEarningsService } from '../services/mentorEarningsService';
 import { CommissionService } from '../services/commissionService';
 import { bookingNotificationService } from '../services/bookingNotificationService';
@@ -61,6 +61,24 @@ export const createBooking = async (req: AuthRequest, res: Response): Promise<vo
     const mentorTz = (mentor as any).timezone || 'UTC';
     
 
+
+    const date = new Date(scheduledAt);
+    if (isPast(date) && !isToday(date)) {
+      res.status(400).json({
+        success: false,
+        error: 'Cannot book a session in the past'
+      });
+      return;
+    }
+
+    // Double check if today and specifically in the past minutes
+    if (isToday(date) && date < new Date()) {
+      res.status(400).json({
+        success: false,
+        error: 'Cannot book a session in the past'
+      });
+      return;
+    }
 
     // Check if service is active
     if (!service.isActive) {
@@ -171,7 +189,7 @@ export const createBooking = async (req: AuthRequest, res: Response): Promise<vo
 
     // Populate service and user details for response
     await booking.populate([
-      { path: 'serviceId', select: 'title description category' },
+      { path: 'serviceId', select: 'title description category images' },
       { path: 'mentorId', select: 'firstName lastName profileImage' },
       { path: 'studentId', select: 'firstName lastName' }
     ]);
@@ -224,7 +242,7 @@ export const getBookings = async (req: AuthRequest, res: Response): Promise<void
 
     const bookings = await Booking.find(query)
       .populate([
-        { path: 'serviceId', select: 'title description category' },
+        { path: 'serviceId', select: 'title description category images' },
         { path: 'mentorId', select: 'firstName lastName profileImage' },
         { path: 'studentId', select: 'firstName lastName' }
       ])
@@ -268,7 +286,7 @@ export const getBooking = async (req: AuthRequest, res: Response): Promise<void>
 
     const booking = await Booking.findById(id)
       .populate([
-        { path: 'serviceId', select: 'title description category hourlyRate' },
+        { path: 'serviceId', select: 'title description category hourlyRate images' },
         { path: 'mentorId', select: 'firstName lastName profileImage email' },
         { path: 'studentId', select: 'firstName lastName email' }
       ]);
@@ -536,7 +554,7 @@ export const updateBookingStatus = async (req: AuthRequest, res: Response): Prom
 
     // Populate details for response
     await booking.populate([
-      { path: 'serviceId', select: 'title description category' },
+      { path: 'serviceId', select: 'title description category images' },
       { path: 'mentorId', select: 'firstName lastName profileImage' },
       { path: 'studentId', select: 'firstName lastName' }
     ]);
@@ -698,6 +716,19 @@ export const getAvailableTimeSlots = async (req: Request, res: Response): Promis
 
     // Parse the date
     const selectedDate = new Date(date as string);
+    const today = startOfDay(new Date());
+
+    if (selectedDate < today) {
+      res.json({
+        success: true,
+        data: {
+          availableSlots: [],
+          message: 'Cannot fetch slots for past dates'
+        }
+      });
+      return;
+    }
+
     const dayOfWeek = format(selectedDate, 'EEEE').toLowerCase();
     
     // Find availability for this day
@@ -747,6 +778,15 @@ export const getAvailableTimeSlots = async (req: Request, res: Response): Promis
       // Check if this time slot conflicts with existing bookings
       const slotStartMinutes = minutes;
       const slotEndMinutes = minutes + service.duration; // Use actual service duration
+
+      // Skip slots that have already passed if the date is today
+      if (isToday(selectedDate)) {
+        const now = new Date();
+        const currentMinutes = now.getHours() * 60 + now.getMinutes();
+        if (slotStartMinutes <= currentMinutes) {
+          continue;
+        }
+      }
       
       // Skip this slot if it would exceed mentor's availability
       if (slotEndMinutes > endMinutes) {

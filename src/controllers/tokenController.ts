@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
+import mongoose from 'mongoose';
 import { User } from '../models/User';
 import { TokenTransaction } from '../models/TokenTransaction';
+import { Booking } from '../models/Booking';
 import { AuthRequest } from '../types';
 import { StripeService, CreatePaymentIntentParams } from '../services/stripeService';
 import { ReferralService } from '../services/referralService';
@@ -302,5 +304,69 @@ export const deductTokens = async (userId: string, amount: number, description: 
   } catch (error) {
     console.error('Deduct tokens error:', error);
     return { success: false };
+  }
+};
+
+// Get total token spend
+export const getTotalSpend = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = (req.user as any)?._id;
+    
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        error: 'User not authenticated'
+      });
+      return;
+    }
+
+     // Sum up all credit transactions (purchases)
+    const tokenPurchases = await TokenTransaction.aggregate([
+      { 
+        $match: { 
+          userId: new mongoose.Types.ObjectId(userId.toString()), 
+          type: 'credit',
+          reference: { $regex: /^stripe_/ }
+        } 
+      },
+      { 
+        $group: { 
+          _id: null, 
+          total: { $sum: '$amount' } 
+        } 
+      }
+    ]);
+
+    // Sum up all direct Stripe bookings
+    const directBookings = await Booking.aggregate([
+      {
+        $match: {
+          studentId: new mongoose.Types.ObjectId(userId.toString()),
+          paymentMethod: 'stripe',
+          paymentStatus: 'paid'
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: '$amount' }
+        }
+      }
+    ]);
+
+    const totalSpent = (tokenPurchases[0]?.total || 0) + (directBookings[0]?.total || 0);
+
+    res.json({
+      success: true,
+      data: {
+        totalSpent
+      }
+    });
+  } catch (error) {
+    console.error('Get total spend error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
   }
 };

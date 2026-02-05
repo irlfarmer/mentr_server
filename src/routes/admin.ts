@@ -20,6 +20,9 @@ import {
   getAllMentorEarnings,
   getPlatformStats,
   handleVerificationDecision,
+  refundTransaction,
+  processManualPayout,
+  retryFailedTransaction,
   requireAdmin
 } from '../controllers/adminController';
 import { authenticate } from '../middleware/auth';
@@ -42,9 +45,20 @@ router.patch('/users/:userId/verify', verifyUser);
 // Verifications
 router.get('/verifications/pending', getPendingVerifications);
 router.post('/verifications/:requestId/decision', handleVerificationDecision);
+router.post('/verifications/:requestId/approve', (req, res) => {
+  req.body.decision = 'approve';
+  handleVerificationDecision(req, res);
+});
+router.post('/verifications/:requestId/reject', (req, res) => {
+  req.body.decision = 'reject';
+  handleVerificationDecision(req, res);
+});
 
 // Transactions
 router.get('/transactions/recent', getRecentTransactions);
+router.post('/transactions/:transactionId/refund', refundTransaction);
+router.post('/transactions/:transactionId/payout', processManualPayout);
+router.post('/transactions/:transactionId/retry', retryFailedTransaction);
 
 // Analytics
 router.get('/activity', getPlatformActivity);

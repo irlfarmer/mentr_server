@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { Service } from '../models/Service';
 import { Review } from '../models/Review';
 import { AuthRequest } from '../types';
+import { sanitizeUser } from '../utils/masking';
 
 // Helper function to calculate average rating for services
 const calculateServiceRatings = async (services: any[]) => {
@@ -12,8 +13,13 @@ const calculateServiceRatings = async (services: any[]) => {
         ? reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length 
         : null;
       
+      const serviceObj = service.toObject() as any;
+      if (serviceObj.mentor) {
+        serviceObj.mentor = sanitizeUser(serviceObj.mentor);
+      }
+      
       return {
-        ...service.toObject(),
+        ...serviceObj,
         rating: averageRating,
         reviewCount: reviews.length
       };
@@ -111,7 +117,7 @@ export const getServices = async (req: Request, res: Response): Promise<void> =>
     const sort: any = { [sortBy as string]: sortOrder === 'desc' ? -1 : 1 };
 
     const services = await Service.find(query)
-      .populate('mentor', 'firstName lastName profileImage bio userType hourlyRate coldMessageRate timezone isVerified verificationScore')
+      .populate('mentor', 'firstName lastName profileImage bio userType hourlyRate coldMessageRate timezone isVerified verificationScore isAnonymous anonymityReason')
       .sort(sort)
       .skip(skip)
       .limit(Number(limit));
@@ -146,7 +152,7 @@ export const getService = async (req: Request, res: Response): Promise<void> => 
     const { id } = req.params;
 
     const service = await Service.findById(id)
-      .populate('mentor', 'firstName lastName profileImage bio userType skills hourlyRate coldMessageRate timezone isVerified verificationScore');
+      .populate('mentor', 'firstName lastName profileImage bio userType skills hourlyRate coldMessageRate timezone isVerified verificationScore isAnonymous anonymityReason');
 
     if (!service) {
       res.status(404).json({
@@ -287,12 +293,18 @@ export const getServicesByMentor = async (req: Request, res: Response): Promise<
     }
 
     const services = await Service.find(query)
-      .populate('mentor', 'firstName lastName profileImage bio userType isVerified verificationScore')
+      .populate('mentor', 'firstName lastName profileImage bio userType isVerified verificationScore isAnonymous anonymityReason')
       .sort({ createdAt: -1 });
+
+    const sanitizedServices = services.map(service => {
+      const s = service.toObject() as any;
+      if (s.mentor) s.mentor = sanitizeUser(s.mentor);
+      return s;
+    });
 
     res.json({
       success: true,
-      data: services
+      data: sanitizedServices
     });
   } catch (error) {
     console.error('Get services by mentor error:', error);

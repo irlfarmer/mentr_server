@@ -35,8 +35,12 @@ import emailPreferencesRoutes from './routes/emailPreferences';
 import webhookRoutes from './routes/webhooks';
 import referralRoutes from './routes/referrals';
 import noteRoutes from './routes/notes';
+import reportRoutes from './routes/reports';
+import supportRoutes from './routes/support';
+import broadcastRoutes from './routes/broadcast';
 import { CronService } from './services/cronService';
 import { NoteCleanupService } from './services/noteCleanupService';
+import { globalLimiter } from './middleware/rateLimit';
 
 // Load environment variables
 dotenv.config();
@@ -82,6 +86,9 @@ app.use(cors({
   ],
   credentials: true
 }));
+
+// Global Rate Limiter
+app.use(globalLimiter);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -141,6 +148,9 @@ app.use('/api/notification-preferences', notificationPreferencesRoutes);
 app.use('/api/email-preferences', emailPreferencesRoutes);
 app.use('/api/referrals', referralRoutes);
 app.use('/api/notes', noteRoutes);
+app.use('/api/reports', reportRoutes);
+app.use('/api/support', supportRoutes);
+app.use('/api/broadcast', broadcastRoutes);
 app.use('/api', vcsRoutes);
 
 // 404 handler
@@ -173,6 +183,16 @@ io.on('connection', (socket: any) => {
     await presenceService.setUserOnline(userId, socket.id);
   });
 
+  // Admin joins support room
+  socket.on('join-admin-room', () => {
+    socket.join('admin_support');
+  });
+
+  // Admin joins support room
+  socket.on('join-admin-room', () => {
+    socket.join('admin_support');
+  });
+
   // User joins a conversation room
   socket.on('join-conversation', (conversationId: string) => {
     socket.join(`conversation_${conversationId}`);
@@ -197,6 +217,25 @@ io.on('connection', (socket: any) => {
       userId: data.userId,
       isTyping: false,
       conversationId: data.conversationId
+    });
+  });
+
+  // Admin typing indicators - emit to user's conversation room
+  socket.on('admin-typing-start', (conversationId: string) => {
+    socket.to(`conversation_${conversationId}`).emit('admin-typing', { isTyping: true });
+  });
+
+  socket.on('admin-typing-stop', (conversationId: string) => {
+    socket.to(`conversation_${conversationId}`).emit('admin-typing', { isTyping: false });
+  });
+
+  // User typing with content - relay to admin for live preview
+  socket.on('user-typing-with-content', (data: { conversationId: string; content: string; isTyping: boolean }) => {
+    // Send to admin support room so admins can see what user is typing
+    socket.to('admin_support').emit('user-typing-preview', {
+      conversationId: data.conversationId,
+      content: data.content,
+      isTyping: data.isTyping
     });
   });
 

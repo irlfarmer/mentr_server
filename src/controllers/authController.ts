@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { User } from '../models/User';
-import { generateToken } from '../utils/jwt';
+import { generateToken, generateRefreshToken, verifyToken } from '../utils/jwt';
 import { LoginCredentials, RegisterData } from '../types';
 import emailService from '../services/emailService';
 import crypto from 'crypto';
@@ -45,12 +45,25 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       verificationLink
     });
 
-    // Generate token
-    const token = generateToken({
+    // Generate tokens
+    const accessToken = generateToken({
       userId: (user._id as any).toString(),
       email: user.email,
       userType: user.userType
     });
+    
+    const refreshToken = generateRefreshToken((user._id as any).toString());
+    
+    // Save refresh token
+    user.refreshTokens = user.refreshTokens || [];
+    user.refreshTokens.push({
+      token: refreshToken,
+      expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+      createdAt: new Date(),
+      createdByIp: req.ip
+    });
+    
+    await user.save();
 
     res.status(201).json({
       success: true,
@@ -61,9 +74,11 @@ export const register = async (req: Request, res: Response): Promise<void> => {
           firstName: user.firstName,
           lastName: user.lastName,
           userType: user.userType,
-          isEmailVerified: user.isEmailVerified
+          isEmailVerified: user.isEmailVerified,
+          isOnboarded: user.isOnboarded
         },
-        token
+        token: accessToken,
+        refreshToken
       },
       message: emailSent 
         ? 'User registered successfully. Please check your email to verify your account.'
@@ -111,18 +126,37 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Generate token
-    const token = generateToken({
+    // Generate tokens
+    const accessToken = generateToken({
       userId: (user._id as any).toString(),
       email: user.email,
       userType: user.userType
     });
 
+    const refreshToken = generateRefreshToken((user._id as any).toString());
+    
+    // Save refresh token
+    user.refreshTokens = user.refreshTokens || [];
+    user.refreshTokens.push({
+      token: refreshToken,
+      expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+      createdAt: new Date(),
+      createdByIp: req.ip
+    });
+
+    // Limit number of refresh tokens (e.g., max 5 devices) (prevent infinite growth)
+    if (user.refreshTokens.length > 5) {
+        user.refreshTokens = user.refreshTokens.slice(-5);
+    }
+    
+    await user.save();
+
     res.status(200).json({
       success: true,
       data: {
         user,
-        token
+        token: accessToken,
+        refreshToken
       },
       message: 'Login successful'
     });
@@ -437,12 +471,9 @@ export const resetPassword = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    // Hash new password
-    const saltRounds = 12;
-    const hashedPassword = await bcrypt.hash(password, saltRounds);
-
     // Update user password and clear reset token
-    user.password = hashedPassword;
+    // Pre-save hook will handle hashing
+    user.password = password;
     user.passwordResetToken = undefined;
     user.passwordResetExpires = undefined;
     await user.save();
@@ -457,5 +488,90 @@ export const resetPassword = async (req: Request, res: Response): Promise<void> 
       success: false,
       error: 'Internal server error'
     });
+  }
+};
+
+// Refresh Token Logic
+export const refreshToken = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { refreshToken } = req.body;
+
+    if (!refreshToken) {
+      res.status(400).json({ success: false, error: 'Refresh token required' });
+      return;
+    }
+
+    // Verify token
+    const decoded = verifyToken(refreshToken);
+    
+    // Find user
+    const user = await User.findById(decoded.userId);
+    if (!user) {
+      res.status(401).json({ success: false, error: 'User not found' });
+      return;
+    }
+
+    // Check if token exists in DB
+    const tokenIndex = user.refreshTokens.findIndex(t => t.token === refreshToken);
+    
+    if (tokenIndex === -1) {
+      // Token reuse detection could allow invalidating ALL tokens here for security
+      res.status(401).json({ success: false, error: 'Invalid refresh token' });
+      return;
+    }
+
+    // Remove old token (Rotation)
+    user.refreshTokens.splice(tokenIndex, 1);
+
+    // Generate new tokens
+    const newAccessToken = generateToken({
+      userId: (user._id as any).toString(),
+      email: user.email,
+      userType: user.userType
+    });
+    
+    const newRefreshToken = generateRefreshToken((user._id as any).toString());
+
+    // Add new token
+    user.refreshTokens.push({
+      token: newRefreshToken,
+      expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      createdAt: new Date(),
+      createdByIp: req.ip
+    });
+
+    await user.save();
+
+    res.json({
+      success: true,
+      data: {
+        token: newAccessToken,
+        refreshToken: newRefreshToken
+      }
+    });
+
+  } catch (error) {
+    res.status(401).json({ success: false, error: 'Invalid or expired refresh token' });
+  }
+};
+
+export const logout = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { refreshToken } = req.body;
+    const userId = (req as any).user?._id;
+
+    if (userId) {
+       const user = await User.findById(userId);
+       if (user) {
+         if (refreshToken) {
+             user.refreshTokens = user.refreshTokens.filter(t => t.token !== refreshToken);
+             await user.save();
+         }
+       }
+    }
+
+    res.json({ success: true, message: 'Logged out successfully' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Logout failed' });
   }
 };

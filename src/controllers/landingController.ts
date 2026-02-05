@@ -3,6 +3,7 @@ import { Service } from '../models/Service';
 import { User } from '../models/User';
 import { Booking } from '../models/Booking';
 import { Review } from '../models/Review';
+import { maskString, sanitizeUser } from '../utils/masking';
 
 // Get featured mentors (3-day rolling window of most active mentors)
 export const getFeaturedMentors = async (req: Request, res: Response): Promise<void> => {
@@ -84,6 +85,8 @@ export const getFeaturedMentors = async (req: Request, res: Response): Promise<v
           skills: 1,
           verificationScore: 1,
           interactionScore: 1,
+          isAnonymous: 1,
+          anonymityReason: 1,
           activeServices: { $size: '$activeServices' }
         }
       }
@@ -116,18 +119,23 @@ export const getFeaturedMentors = async (req: Request, res: Response): Promise<v
         ]);
 
         const ratingData = reviews[0] || { averageRating: null, reviewCount: 0 };
+        const sanitized = sanitizeUser(mentor);
 
         return {
-          id: mentor._id.toString(),
-          name: `${mentor.firstName} ${mentor.lastName}`,
-          expertise: mentor.skills?.[0] || 'Professional Mentor',
-          price: mentor.hourlyRate || 0,
+          id: sanitized._id.toString(),
+          name: sanitized.isAnonymous 
+            ? `${sanitized.firstName} ${sanitized.lastName}`
+            : `${sanitized.firstName} ${sanitized.lastName}`,
+          expertise: sanitized.skills?.[0] || 'Professional Mentor',
+          price: sanitized.hourlyRate || 0,
           priceType: 'per hour',
-          image: mentor.profileImage || '/api/placeholder/80/80',
-          verified: mentor.verificationScore > 0.7,
+          image: sanitized.profileImage,
+          verified: sanitized.verificationScore > 0.7,
           rating: ratingData.averageRating ? Math.round(ratingData.averageRating * 10) / 10 : 5,
           reviewCount: ratingData.reviewCount,
-          activeServices: mentor.activeServices
+          activeServices: sanitized.activeServices,
+          isAnonymous: sanitized.isAnonymous,
+          anonymityReason: sanitized.anonymityReason
         };
       })
     );

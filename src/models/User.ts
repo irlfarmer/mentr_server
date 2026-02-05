@@ -93,14 +93,23 @@ export interface IUserDocument extends Document {
     lastUpdated?: Date;
   };
   availability: IAvailability[];
+  isOnboarded: boolean;
   isActive: boolean;
   isBanned: boolean;
   emailVerified: boolean;
   timezone: string;
   isOnline: boolean;
   lastSeen: Date;
+  isAnonymous: boolean;
+  anonymityReason?: string;
   createdAt: Date;
   updatedAt: Date;
+  refreshTokens: Array<{
+    token: string;
+    expires: Date;
+    createdAt: Date;
+    createdByIp?: string;
+  }>;
   comparePassword(candidatePassword: string): Promise<boolean>;
 }
 
@@ -318,6 +327,10 @@ const UserSchema = new Schema<IUserDocument>({
     lastUpdated: { type: Date, default: Date.now }
   },
   availability: [AvailabilitySchema],
+  isOnboarded: {
+    type: Boolean,
+    default: false
+  },
   isActive: {
     type: Boolean,
     default: true
@@ -340,9 +353,30 @@ const UserSchema = new Schema<IUserDocument>({
   },
   lastSeen: {
     type: Date
+  },
+  isAnonymous: {
+    type: Boolean,
+    default: false
+  },
+  anonymityReason: {
+    type: String,
+    maxlength: 200
   }
 }, {
   timestamps: true
+});
+
+// Refresh Token Schema (embedded in User)
+// We don't need a separate schema definition if it's simple object structure in array, 
+// but defining it ensures types.
+// Actually, let's just add it to UserSchema directly as we did in interface.
+UserSchema.add({
+  refreshTokens: [{
+    token: { type: String, required: true },
+    expires: { type: Date, required: true },
+    createdAt: { type: Date, default: Date.now },
+    createdByIp: { type: String }
+  }]
 });
 
 // Additional indexes (email and linkedinId already have unique indexes)

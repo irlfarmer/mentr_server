@@ -3,13 +3,14 @@ import { uploadProfile, uploadService, deleteImage } from '../config/cloudinary'
 import { authenticate } from '../middleware/auth';
 import { User } from '../models/User';
 import { Service } from '../models/Service';
+import { AuthRequest } from '../types';
 import multer from 'multer';
 import { v2 as cloudinary } from 'cloudinary';
 
 const router = express.Router();
 
 // Upload profile picture
-router.post('/profile-picture', authenticate, uploadProfile.single('profileImage'), async (req, res): Promise<void> => {
+router.post('/profile-picture', authenticate, uploadProfile.single('profileImage'), async (req: AuthRequest, res): Promise<void> => {
   try {
     if (!req.file) {
       res.status(400).json({ success: false, message: 'No image uploaded' });
@@ -52,7 +53,7 @@ router.post('/profile-picture', authenticate, uploadProfile.single('profileImage
 });
 
 // Upload service images
-router.post('/service-images', authenticate, uploadService.array('images', 5), async (req, res): Promise<void> => {
+router.post('/service-images', authenticate, uploadService.array('images', 5), async (req: AuthRequest, res): Promise<void> => {
   try {
     if (!req.files || req.files.length === 0) {
       res.status(400).json({ success: false, message: 'No images uploaded' });
@@ -77,7 +78,7 @@ router.post('/service-images', authenticate, uploadService.array('images', 5), a
 });
 
 // Update service with images
-router.patch('/service/:serviceId/images', authenticate, async (req, res): Promise<void> => {
+router.patch('/service/:serviceId/images', authenticate, async (req: AuthRequest, res): Promise<void> => {
   try {
     const { serviceId } = req.params;
     const { images } = req.body;
@@ -113,7 +114,7 @@ router.patch('/service/:serviceId/images', authenticate, async (req, res): Promi
 });
 
 // Delete image
-router.delete('/image/:publicId', authenticate, async (req, res): Promise<void> => {
+router.delete('/image/:publicId', authenticate, async (req: AuthRequest, res): Promise<void> => {
   try {
     const { publicId } = req.params;
     
@@ -158,7 +159,7 @@ const documentUpload = multer({
 });
 
 // Upload document (for education, work experience, skills verification)
-router.post('/document', authenticate, documentUpload.single('file'), async (req, res): Promise<void> => {
+router.post('/document', authenticate, documentUpload.single('file'), async (req: AuthRequest, res): Promise<void> => {
   try {
     if (!req.file) {
       res.status(400).json({ success: false, message: 'No file uploaded' });
